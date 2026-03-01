@@ -134,12 +134,14 @@ class LiveLocationPlugin : FlutterPlugin, ActivityAware {
             val timeInterval = (call.argument<Number>("timeIntervalSeconds") ?: 2).toInt()
             val accuracy = call.argument<String>("accuracy") ?: "high"
             val enableBackground = call.argument<Boolean>("enableBackground") ?: false
+            val distanceFilter = (call.argument<Number>("distanceFilterMeters") ?: 0.0).toDouble()
 
             locationManager = LocationManager(
                 context = context,
                 timeIntervalSeconds = timeInterval,
                 accuracy = accuracy,
                 enableBackground = enableBackground,
+                distanceFilterMeters = distanceFilter,
                 foregroundEventSink = { location ->
                     foregroundEventSink?.success(location)
                 },

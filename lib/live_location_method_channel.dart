@@ -48,6 +48,7 @@ class MethodChannelLiveLocation extends LiveLocationPlatform {
         'timeIntervalSeconds': config.timeIntervalSeconds,
         'accuracy': config.accuracy.toString().split('.').last,
         'enableBackground': config.enableBackground,
+        'distanceFilterMeters': config.distanceFilterMeters,
       });
 
       // Handle callbacks pushed from native (e.g. permission errors)

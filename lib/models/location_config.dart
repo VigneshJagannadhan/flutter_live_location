@@ -22,6 +22,14 @@ class LocationConfig {
   /// Default: false
   final bool enableBackground;
 
+  /// Minimum distance in metres the device must move before an update is emitted.
+  ///
+  /// Set to 0 to disable distance filtering and rely on [timeIntervalSeconds]
+  /// alone. On both platforms the value is forwarded to the native location
+  /// provider, so the OS itself suppresses unnecessary wake-ups.
+  /// Default: 0
+  final double distanceFilterMeters;
+
   /// Creates a location tracking configuration.
   ///
   /// All parameters except those with defaults must be provided.
@@ -30,13 +38,16 @@ class LocationConfig {
     required this.timeIntervalSeconds,
     required this.accuracy,
     required this.enableBackground,
-  }) : assert(timeIntervalSeconds > 0, 'timeIntervalSeconds must be > 0');
+    this.distanceFilterMeters = 0,
+  }) : assert(timeIntervalSeconds > 0, 'timeIntervalSeconds must be > 0'),
+       assert(distanceFilterMeters >= 0, 'distanceFilterMeters must be >= 0');
 
   @override
   String toString() =>
       'LocationConfig('
       'interval: ${timeIntervalSeconds}s, '
       'accuracy: $accuracy, '
+      'distance: ${distanceFilterMeters}m, '
       'background: $enableBackground'
       ')';
 
@@ -47,11 +58,13 @@ class LocationConfig {
           runtimeType == other.runtimeType &&
           timeIntervalSeconds == other.timeIntervalSeconds &&
           accuracy == other.accuracy &&
-          enableBackground == other.enableBackground;
+          enableBackground == other.enableBackground &&
+          distanceFilterMeters == other.distanceFilterMeters;
 
   @override
   int get hashCode =>
       timeIntervalSeconds.hashCode ^
       accuracy.hashCode ^
-      enableBackground.hashCode;
+      enableBackground.hashCode ^
+      distanceFilterMeters.hashCode;
 }

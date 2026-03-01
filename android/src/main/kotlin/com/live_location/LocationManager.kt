@@ -23,6 +23,7 @@ class LocationManager(
     private val timeIntervalSeconds: Int,
     private val accuracy: String,
     private val enableBackground: Boolean,
+    private val distanceFilterMeters: Double,
     private val foregroundEventSink: (Map<String, Any?>) -> Unit,
     private val backgroundEventSink: (Map<String, Any?>) -> Unit,
     private val onError: (String, String) -> Unit,
@@ -54,11 +55,14 @@ class LocationManager(
 
     /// Creates the LocationRequest with configured filters.
     private fun createLocationRequest() {
-        locationRequest = LocationRequest.Builder(
+        val builder = LocationRequest.Builder(
             getPriorityFromAccuracy(accuracy),
-            timeIntervalSeconds * 1000L
+            timeIntervalSeconds * 1000L,
         )
-            .build()
+        if (distanceFilterMeters > 0.0) {
+            builder.setMinUpdateDistanceMeters(distanceFilterMeters.toFloat())
+        }
+        locationRequest = builder.build()
     }
 
     /// Maps accuracy string to Priority constant.
