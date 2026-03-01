@@ -12,7 +12,9 @@ import 'models/location_update.dart';
 class MethodChannelLiveLocation extends LiveLocationPlatform {
   /// The MethodChannel used for communication with native code.
   @visibleForTesting
-  final methodChannel = const MethodChannel('com.flutter_live_location/methods');
+  final methodChannel = const MethodChannel(
+    'com.flutter_live_location/methods',
+  );
 
   /// The EventChannel for foreground location updates.
   @visibleForTesting

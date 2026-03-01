@@ -8,7 +8,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   MethodChannelLiveLocation platform = MethodChannelLiveLocation();
-  const MethodChannel channel = MethodChannel('com.flutter_live_location/methods');
+  const MethodChannel channel = MethodChannel(
+    'com.flutter_live_location/methods',
+  );
 
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
