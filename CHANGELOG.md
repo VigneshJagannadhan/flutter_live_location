@@ -1,3 +1,13 @@
+## 0.2.0 — 2026-03-01
+
+### Features
+
+- initial release of flutter_live_location
+
+### Bug Fixes
+
+- correct GitHub URLs and README import
+
 ## 0.1.0 — 2026-03-01
 
 ### Features
