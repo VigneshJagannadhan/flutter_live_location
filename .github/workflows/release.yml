@@ -173,8 +173,21 @@ jobs:
         env:
           PUB_CREDENTIALS: ${{ secrets.PUB_CREDENTIALS }}
         run: |
+          if [ -z "$PUB_CREDENTIALS" ]; then
+            echo "ERROR: PUB_CREDENTIALS secret is empty. Add it in Settings → Secrets."
+            exit 1
+          fi
+
           mkdir -p "$HOME/.pub-cache"
-          echo "$PUB_CREDENTIALS" > "$HOME/.pub-cache/credentials.json"
+          printf '%s' "$PUB_CREDENTIALS" > "$HOME/.pub-cache/credentials.json"
+
+          echo "Credentials file written. Verifying..."
+          if [ ! -s "$HOME/.pub-cache/credentials.json" ]; then
+            echo "ERROR: credentials.json is empty after write."
+            exit 1
+          fi
+          echo "credentials.json size: $(wc -c < "$HOME/.pub-cache/credentials.json") bytes"
+
           flutter pub publish --force
 
       # ── Commit, tag, push — only if publish succeeded ─────────────────────────
