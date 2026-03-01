@@ -150,10 +150,27 @@ class LiveLocation {
     }
   }
 
-  /// Sets up listeners for platform events.
+  /// Wires the platform interface callbacks to this instance's stream controllers.
+  ///
+  /// The platform channel layer calls [onForegroundLocation] and
+  /// [onBackgroundLocation] when native events arrive. By setting these here —
+  /// in the public API layer — we keep the method channel layer free of any
+  /// reference to this class, eliminating the circular dependency.
   void _setupPlatformListeners() {
-    // Listen to foreground location updates from platform
-    // (Implementation connects to MethodChannel in platform_interface.dart)
+    _platform.onForegroundLocation = _onForegroundLocation;
+    _platform.onBackgroundLocation = _onBackgroundLocation;
+  }
+
+  void _onForegroundLocation(LocationUpdate location) {
+    if (_isDisposed) return;
+    _lastKnownLocation = location;
+    _foregroundStreamController.add(location);
+  }
+
+  void _onBackgroundLocation(LocationUpdate location) {
+    if (_isDisposed) return;
+    _lastKnownLocation = location;
+    _backgroundStreamController.add(location);
   }
 
   /// Called when a stream gets its first listener.
@@ -262,26 +279,6 @@ class LiveLocation {
     }
   }
 
-  /// Emits a location update to foreground stream.
-  ///
-  /// This is called by the platform implementation via the platform interface.
-  void emitForegroundLocation(LocationUpdate location) {
-    if (_isDisposed) return;
-
-    _lastKnownLocation = location;
-    _foregroundStreamController.add(location);
-  }
-
-  /// Emits a location update to background stream.
-  ///
-  /// This is called by the platform implementation via the platform interface.
-  void emitBackgroundLocation(LocationUpdate location) {
-    if (_isDisposed) return;
-
-    _lastKnownLocation = location;
-    _backgroundStreamController.add(location);
-  }
-
   /// Disposes the plugin and cleans up all resources.
   ///
   /// After calling dispose, the singleton is reset and [initialize] can be
@@ -306,6 +303,11 @@ class LiveLocation {
       // Close streams
       await _foregroundStreamController.close();
       await _backgroundStreamController.close();
+
+      // Detach callbacks before platform dispose so a stale reference to this
+      // instance cannot receive events after the singleton has been reset.
+      _platform.onForegroundLocation = null;
+      _platform.onBackgroundLocation = null;
 
       // Call platform dispose
       await _platform.dispose();

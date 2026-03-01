@@ -2,6 +2,7 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'live_location_method_channel.dart';
 import 'models/location_config.dart';
+import 'models/location_update.dart';
 
 /// Abstract platform interface for live location tracking.
 ///
@@ -27,6 +28,28 @@ abstract class LiveLocationPlatform extends PlatformInterface {
     PlatformInterface.verifyToken(instance, _token);
     _instance = instance;
   }
+
+  // ---------------------------------------------------------------------------
+  // Upward data callbacks
+  //
+  // Set by the public API layer (LiveLocation) during initialization so that
+  // the platform channel layer can push location events upward without
+  // importing or referencing the public API class.
+  // ---------------------------------------------------------------------------
+
+  /// Invoked by the platform channel layer when a foreground location arrives.
+  ///
+  /// The public API layer sets this during [initialize] via
+  /// [LiveLocation._setupPlatformListeners]. Platform implementations must
+  /// call this instead of reaching directly into the public API singleton.
+  void Function(LocationUpdate)? onForegroundLocation;
+
+  /// Invoked by the platform channel layer when a background location arrives.
+  ///
+  /// The public API layer sets this during [initialize] via
+  /// [LiveLocation._setupPlatformListeners]. Platform implementations must
+  /// call this instead of reaching directly into the public API singleton.
+  void Function(LocationUpdate)? onBackgroundLocation;
 
   /// Initializes the platform-specific implementation.
   ///

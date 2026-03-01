@@ -20,6 +20,15 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     private var lastEmittedLocation: CLLocation?
     private var lastEmissionTime: Date?
 
+    /// Guards `isInBackground` for cross-thread reads/writes.
+    private let stateLock = NSLock()
+    /// Tracks whether the app is currently in the background.
+    ///
+    /// Written on the main thread via NotificationCenter; read on the
+    /// location callback thread under `stateLock` to avoid any
+    /// synchronous main-thread dispatch (which risks deadlock).
+    private var isInBackground: Bool = false
+
     weak var plugin: LiveLocationPlugin?
 
     init(
@@ -56,6 +65,40 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
             locationManager.allowsBackgroundLocationUpdates = true
             locationManager.pausesLocationUpdatesAutomatically = false
         }
+
+        // Capture initial app state. setupLocationManager() is called from
+        // init(), which is invoked on the main thread via MethodChannel, so
+        // UIApplication.shared is safe to read here.
+        isInBackground = UIApplication.shared.applicationState == .background
+
+        // Observe app lifecycle transitions to keep isInBackground in sync.
+        // These notifications always fire on the main thread, so no lock is
+        // needed when writing inside the selectors.
+        let nc = NotificationCenter.default
+        nc.addObserver(
+            self,
+            selector: #selector(handleAppDidEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+        nc.addObserver(
+            self,
+            selector: #selector(handleAppWillEnterForeground),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
+    }
+
+    @objc private func handleAppDidEnterBackground() {
+        stateLock.lock()
+        isInBackground = true
+        stateLock.unlock()
+    }
+
+    @objc private func handleAppWillEnterForeground() {
+        stateLock.lock()
+        isInBackground = false
+        stateLock.unlock()
     }
 
     private func getAccuracyLevel(from accuracy: String) -> CLLocationAccuracy {
@@ -120,6 +163,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
 
     func dispose() {
         stopTracking()
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - CLLocationManagerDelegate
@@ -134,16 +178,14 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
             // Apply time and distance filters
             if shouldEmitLocation(location) {
                 let locationMap = locationToMap(location)
-                
-                // Determine application state on the main thread
-                var isForeground = true
-                if Thread.isMainThread {
-                    isForeground = UIApplication.shared.applicationState != .background
-                } else {
-                    DispatchQueue.main.sync {
-                        isForeground = UIApplication.shared.applicationState != .background
-                    }
-                }
+
+                // Read the pre-computed background flag under lock.
+                // This avoids any main-thread dispatch from the location
+                // callback thread, eliminating the deadlock risk that
+                // DispatchQueue.main.sync would introduce.
+                stateLock.lock()
+                let isForeground = !isInBackground
+                stateLock.unlock()
 
                 if isForeground {
                     foregroundEventSink(locationMap)

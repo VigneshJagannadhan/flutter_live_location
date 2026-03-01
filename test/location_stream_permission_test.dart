@@ -23,6 +23,12 @@ class _SuccessMockPlatform
     with MockPlatformInterfaceMixin
     implements LiveLocationPlatform {
   @override
+  void Function(LocationUpdate)? onForegroundLocation;
+
+  @override
+  void Function(LocationUpdate)? onBackgroundLocation;
+
+  @override
   Future<void> initialize({required LocationConfig config}) => Future.value();
 
   @override
@@ -48,6 +54,12 @@ class _SuccessMockPlatform
 class _PermissionDeniedMockPlatform
     with MockPlatformInterfaceMixin
     implements LiveLocationPlatform {
+  @override
+  void Function(LocationUpdate)? onForegroundLocation;
+
+  @override
+  void Function(LocationUpdate)? onBackgroundLocation;
+
   @override
   Future<void> initialize({required LocationConfig config}) => Future.value();
 
@@ -114,10 +126,13 @@ void main() {
       await LiveLocation.initialize(config: _config());
 
       final received = <LocationUpdate>[];
-      final sub =
-          LiveLocation.instance.foregroundLocationStream.listen(received.add);
+      final sub = LiveLocation.instance.foregroundLocationStream.listen(
+        received.add,
+      );
 
-      LiveLocation.instance.emitForegroundLocation(_foregroundUpdate);
+      LiveLocationPlatform.instance.onForegroundLocation?.call(
+        _foregroundUpdate,
+      );
       await Future.microtask(() {});
 
       expect(received, hasLength(1));
@@ -127,33 +142,42 @@ void main() {
       await sub.cancel();
     });
 
-    test('supports multiple simultaneous listeners (broadcast stream)', () async {
-      await LiveLocation.initialize(config: _config());
+    test(
+      'supports multiple simultaneous listeners (broadcast stream)',
+      () async {
+        await LiveLocation.initialize(config: _config());
 
-      final first = <LocationUpdate>[];
-      final second = <LocationUpdate>[];
+        final first = <LocationUpdate>[];
+        final second = <LocationUpdate>[];
 
-      final sub1 =
-          LiveLocation.instance.foregroundLocationStream.listen(first.add);
-      final sub2 =
-          LiveLocation.instance.foregroundLocationStream.listen(second.add);
+        final sub1 = LiveLocation.instance.foregroundLocationStream.listen(
+          first.add,
+        );
+        final sub2 = LiveLocation.instance.foregroundLocationStream.listen(
+          second.add,
+        );
 
-      LiveLocation.instance.emitForegroundLocation(_foregroundUpdate);
-      await Future.microtask(() {});
+        LiveLocationPlatform.instance.onForegroundLocation?.call(
+          _foregroundUpdate,
+        );
+        await Future.microtask(() {});
 
-      expect(first, hasLength(1));
-      expect(second, hasLength(1));
+        expect(first, hasLength(1));
+        expect(second, hasLength(1));
 
-      await sub1.cancel();
-      await sub2.cancel();
-    });
+        await sub1.cancel();
+        await sub2.cancel();
+      },
+    );
 
     test('caches the last foreground update in lastKnownLocation', () async {
       await LiveLocation.initialize(config: _config());
 
       expect(LiveLocation.instance.lastKnownLocation, isNull);
 
-      LiveLocation.instance.emitForegroundLocation(_foregroundUpdate);
+      LiveLocationPlatform.instance.onForegroundLocation?.call(
+        _foregroundUpdate,
+      );
       await Future.microtask(() {});
 
       expect(
@@ -185,10 +209,13 @@ void main() {
       await LiveLocation.initialize(config: _config(background: true));
 
       final received = <LocationUpdate>[];
-      final sub =
-          LiveLocation.instance.backgroundLocationStream.listen(received.add);
+      final sub = LiveLocation.instance.backgroundLocationStream.listen(
+        received.add,
+      );
 
-      LiveLocation.instance.emitBackgroundLocation(_backgroundUpdate);
+      LiveLocationPlatform.instance.onBackgroundLocation?.call(
+        _backgroundUpdate,
+      );
       await Future.microtask(() {});
 
       expect(received, hasLength(1));
@@ -201,7 +228,9 @@ void main() {
     test('caches the last background update in lastKnownLocation', () async {
       await LiveLocation.initialize(config: _config(background: true));
 
-      LiveLocation.instance.emitBackgroundLocation(_backgroundUpdate);
+      LiveLocationPlatform.instance.onBackgroundLocation?.call(
+        _backgroundUpdate,
+      );
       await Future.microtask(() {});
 
       expect(
@@ -215,8 +244,12 @@ void main() {
       () async {
         await LiveLocation.initialize(config: _config(background: true));
 
-        LiveLocation.instance.emitForegroundLocation(_foregroundUpdate);
-        LiveLocation.instance.emitBackgroundLocation(_backgroundUpdate);
+        LiveLocationPlatform.instance.onForegroundLocation?.call(
+          _foregroundUpdate,
+        );
+        LiveLocationPlatform.instance.onBackgroundLocation?.call(
+          _backgroundUpdate,
+        );
         await Future.microtask(() {});
 
         // The most recent emission wins.
@@ -253,8 +286,9 @@ void main() {
         await LiveLocation.initialize(config: _config());
 
         await expectLater(
-          LiveLocation.instance
-              .startLocationUpdates(const Duration(minutes: 1)),
+          LiveLocation.instance.startLocationUpdates(
+            const Duration(minutes: 1),
+          ),
           throwsA(isA<LocationPermissionException>()),
         );
       },
@@ -265,8 +299,9 @@ void main() {
       await LiveLocation.initialize(config: _config());
 
       try {
-        await LiveLocation.instance
-            .startLocationUpdates(const Duration(minutes: 1));
+        await LiveLocation.instance.startLocationUpdates(
+          const Duration(minutes: 1),
+        );
       } on LocationPermissionException {
         // Expected — the platform rejected the start call.
       }
@@ -277,8 +312,9 @@ void main() {
     test('isTracking becomes true when permission is granted', () async {
       await LiveLocation.initialize(config: _config());
 
-      await LiveLocation.instance
-          .startLocationUpdates(const Duration(minutes: 1));
+      await LiveLocation.instance.startLocationUpdates(
+        const Duration(minutes: 1),
+      );
 
       expect(LiveLocation.instance.isTracking, isTrue);
     });
@@ -286,29 +322,29 @@ void main() {
     test('isTracking becomes false after stopLocationUpdates', () async {
       await LiveLocation.initialize(config: _config());
 
-      await LiveLocation.instance
-          .startLocationUpdates(const Duration(minutes: 1));
+      await LiveLocation.instance.startLocationUpdates(
+        const Duration(minutes: 1),
+      );
       expect(LiveLocation.instance.isTracking, isTrue);
 
       await LiveLocation.instance.stopLocationUpdates();
       expect(LiveLocation.instance.isTracking, isFalse);
     });
 
-    test(
-      'startLocationUpdates is idempotent: second call while tracking '
-      'only refreshes the auto-stop timer',
-      () async {
-        await LiveLocation.initialize(config: _config());
+    test('startLocationUpdates is idempotent: second call while tracking '
+        'only refreshes the auto-stop timer', () async {
+      await LiveLocation.initialize(config: _config());
 
-        await LiveLocation.instance
-            .startLocationUpdates(const Duration(minutes: 1));
-        // Call again while already tracking — must not throw or duplicate tracking.
-        await LiveLocation.instance
-            .startLocationUpdates(const Duration(minutes: 2));
+      await LiveLocation.instance.startLocationUpdates(
+        const Duration(minutes: 1),
+      );
+      // Call again while already tracking — must not throw or duplicate tracking.
+      await LiveLocation.instance.startLocationUpdates(
+        const Duration(minutes: 2),
+      );
 
-        expect(LiveLocation.instance.isTracking, isTrue);
-      },
-    );
+      expect(LiveLocation.instance.isTracking, isTrue);
+    });
 
     // ── Native → Dart permission callback ────────────────────────────────
 
@@ -326,8 +362,8 @@ void main() {
         // Mock every method call from Dart → native to return success.
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .setMockMethodCallHandler(channel, (MethodCall call) async {
-          return null;
-        });
+              return null;
+            });
 
         final platform = MethodChannelLiveLocation();
         await platform.initialize(config: _config());
@@ -363,8 +399,8 @@ void main() {
 
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .setMockMethodCallHandler(channel, (MethodCall call) async {
-          return null;
-        });
+              return null;
+            });
 
         final platform = MethodChannelLiveLocation();
         await platform.initialize(config: _config());

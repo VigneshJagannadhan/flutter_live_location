@@ -8,6 +8,12 @@ class MockLiveLocationPlatform
     with MockPlatformInterfaceMixin
     implements LiveLocationPlatform {
   @override
+  void Function(LocationUpdate)? onForegroundLocation;
+
+  @override
+  void Function(LocationUpdate)? onBackgroundLocation;
+
+  @override
   Future<void> initialize({required LocationConfig config}) => Future.value();
 
   @override
