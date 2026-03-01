@@ -178,15 +178,27 @@ jobs:
             exit 1
           fi
 
+          # Write to both credential locations (path changed in Dart 3.x)
           mkdir -p "$HOME/.pub-cache"
+          mkdir -p "$HOME/.config/dart"
           printf '%s' "$PUB_CREDENTIALS" > "$HOME/.pub-cache/credentials.json"
+          printf '%s' "$PUB_CREDENTIALS" > "$HOME/.config/dart/pub-credentials.json"
 
-          echo "Credentials file written. Verifying..."
-          if [ ! -s "$HOME/.pub-cache/credentials.json" ]; then
-            echo "ERROR: credentials.json is empty after write."
-            exit 1
-          fi
-          echo "credentials.json size: $(wc -c < "$HOME/.pub-cache/credentials.json") bytes"
+          echo "Credentials written. Validating JSON structure..."
+          python3 - <<'PYEOF'
+          import json, sys, os
+          path = os.path.expanduser("~/.pub-cache/credentials.json")
+          try:
+              with open(path) as f:
+                  data = json.load(f)
+              keys = list(data.keys())
+              print(f"JSON is valid. Keys found: {keys}")
+              print(f"Has accessToken:  {'accessToken' in data}")
+              print(f"Has refreshToken: {'refreshToken' in data and bool(data['refreshToken'])}")
+          except Exception as e:
+              print(f"ERROR: {e}")
+              sys.exit(1)
+          PYEOF
 
           flutter pub publish --force
 
