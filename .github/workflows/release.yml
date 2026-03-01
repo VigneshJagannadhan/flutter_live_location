@@ -1,0 +1,191 @@
+name: Release
+
+# Triggers on every push to main (i.e. after a PR is merged).
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Auto Release
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────────────
+      # Uses RELEASE_PAT so the release commit can be pushed back to the
+      # protected main branch.  Add yourself as a bypass actor in:
+      #   Settings → Branches → main protection rule →
+      #   "Allow specified actors to bypass required pull requests"
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PAT }}
+
+      # ── Flutter SDK ───────────────────────────────────────────────────────────
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # ── Guard: skip when this push is itself a release commit ─────────────────
+      # Prevents the workflow from re-triggering endlessly after it pushes the
+      # "chore(release): x.y.z" commit back to main.
+      - name: Check for release-commit loop
+        id: guard
+        run: |
+          LAST_MSG=$(git log -1 --format="%s")
+          if [[ "$LAST_MSG" == "chore(release):"* ]]; then
+            echo "Last commit is a release commit — nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Analyze commits → decide version bump ────────────────────────────────
+      # Pre-1.0.0 policy (from ci-cd-rules.md):
+      #   feat / feat! / BREAKING CHANGE → minor bump (0.x.0)
+      #   fix                            → patch bump (0.0.x)
+      #   anything else                  → no release
+      - name: Compute release version
+        if: steps.guard.outputs.skip == 'false'
+        id: release
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --format="%s" HEAD)
+          else
+            COMMITS=$(git log --format="%s" "${LAST_TAG}..HEAD")
+          fi
+
+          echo "──── Commits to analyze ────"
+          echo "$COMMITS"
+          echo "────────────────────────────"
+
+          BUMP=""
+          if echo "$COMMITS" | grep -qE \
+               "^feat(\([^)]+\))?(!)?: |^BREAKING CHANGE:"; then
+            BUMP="minor"
+          elif echo "$COMMITS" | grep -qE "^fix(\([^)]+\))?: "; then
+            BUMP="patch"
+          fi
+
+          if [ -z "$BUMP" ]; then
+            echo "No releasable commits — skipping release."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CURRENT=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+
+          if [ "$BUMP" = "minor" ]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+
+          echo "skip=false"          >> "$GITHUB_OUTPUT"
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "last_tag=$LAST_TAG"   >> "$GITHUB_OUTPUT"
+          echo "bump=$BUMP"           >> "$GITHUB_OUTPUT"
+          echo "New version: $NEW_VERSION  (bump: $BUMP)"
+
+      # ── Update pubspec.yaml ───────────────────────────────────────────────────
+      - name: Bump version in pubspec.yaml
+        if: >
+          steps.guard.outputs.skip == 'false' &&
+          steps.release.outputs.skip == 'false'
+        run: |
+          NEW_VERSION="${{ steps.release.outputs.version }}"
+          sed -i "s/^version: .*/version: ${NEW_VERSION}/" pubspec.yaml
+          grep '^version:' pubspec.yaml
+
+      # ── Prepend CHANGELOG entry ───────────────────────────────────────────────
+      - name: Generate CHANGELOG entry
+        if: >
+          steps.guard.outputs.skip == 'false' &&
+          steps.release.outputs.skip == 'false'
+        run: |
+          NEW_VERSION="${{ steps.release.outputs.version }}"
+          LAST_TAG="${{ steps.release.outputs.last_tag }}"
+          DATE=$(date +%Y-%m-%d)
+
+          if [ -z "$LAST_TAG" ]; then
+            RAW=$(git log --format="%s" HEAD)
+          else
+            RAW=$(git log --format="%s" "${LAST_TAG}..HEAD")
+          fi
+
+          # Extract features and fixes (empty string if none found).
+          FEATS=$(echo "$RAW" | \
+            grep -E "^feat(\([^)]+\))?(!)?: " | \
+            sed -E 's/^feat(\([^)]+\))?(!)?: /- /' \
+            || true)
+          FIXES=$(echo "$RAW" | \
+            grep -E "^fix(\([^)]+\))?: " | \
+            sed -E 's/^fix(\([^)]+\))?: /- /' \
+            || true)
+
+          {
+            echo "## ${NEW_VERSION} — ${DATE}"
+            echo ""
+            if [ -n "$FEATS" ]; then
+              echo "### Features"
+              echo ""
+              echo "$FEATS"
+              echo ""
+            fi
+            if [ -n "$FIXES" ]; then
+              echo "### Bug Fixes"
+              echo ""
+              echo "$FIXES"
+              echo ""
+            fi
+          } > /tmp/new_entry.md
+
+          cat /tmp/new_entry.md CHANGELOG.md > /tmp/full_changelog.md
+          mv /tmp/full_changelog.md CHANGELOG.md
+
+      # ── Commit, tag, push ─────────────────────────────────────────────────────
+      - name: Commit and push release
+        if: >
+          steps.guard.outputs.skip == 'false' &&
+          steps.release.outputs.skip == 'false'
+        run: |
+          NEW_VERSION="${{ steps.release.outputs.version }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pubspec.yaml CHANGELOG.md
+          git commit -m "chore(release): ${NEW_VERSION}"
+          git tag "v${NEW_VERSION}"
+          git push origin main --follow-tags
+
+      # ── Publish to pub.dev ────────────────────────────────────────────────────
+      # PUB_CREDENTIALS must be set in GitHub Secrets.
+      # Value = the full JSON from ~/.pub-cache/credentials.json on your machine
+      # (run `dart pub publish` locally once to generate it, then copy the file).
+      - name: Install Flutter dependencies
+        if: >
+          steps.guard.outputs.skip == 'false' &&
+          steps.release.outputs.skip == 'false'
+        run: flutter pub get
+
+      - name: Publish to pub.dev
+        if: >
+          steps.guard.outputs.skip == 'false' &&
+          steps.release.outputs.skip == 'false'
+        env:
+          PUB_CREDENTIALS: ${{ secrets.PUB_CREDENTIALS }}
+        run: |
+          mkdir -p "$HOME/.pub-cache"
+          echo "$PUB_CREDENTIALS" > "$HOME/.pub-cache/credentials.json"
+          flutter pub publish --force
