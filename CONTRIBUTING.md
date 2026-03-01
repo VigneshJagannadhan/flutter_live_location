@@ -29,7 +29,7 @@ without review.
 
 ## Reporting Bugs
 
-1. Check the [existing issues](https://github.com/vignesh-jagannadhan/flutter_live_location/issues)
+1. Check the [existing issues](https://github.com/VigneshJagannadhan/flutter_live_location/issues)
    to make sure the bug has not already been reported.
 2. Open a new issue and include:
    - A clear title describing the problem.
@@ -43,8 +43,8 @@ without review.
 
 ## Requesting Features
 
-1. Check [existing issues](https://github.com/vignesh-jagannadhan/flutter_live_location/issues) and
-   [open pull requests](https://github.com/vignesh-jagannadhan/flutter_live_location/pulls) first.
+1. Check [existing issues](https://github.com/VigneshJagannadhan/flutter_live_location/issues) and
+   [open pull requests](https://github.com/VigneshJagannadhan/flutter_live_location/pulls) first.
 2. Open an issue labelled **enhancement** and describe:
    - The problem you are trying to solve.
    - Your proposed solution or API design.
@@ -69,7 +69,7 @@ easy to use. Large scope changes will be discussed before any implementation beg
 ### Clone and install
 
 ```bash
-git clone https://github.com/vignesh-jagannadhan/flutter_live_location.git
+git clone https://github.com/VigneshJagannadhan/flutter_live_location.git
 cd live_location
 flutter pub get
 cd example && flutter pub get && cd ..
@@ -218,9 +218,9 @@ docs: update iOS background mode setup steps
 
 ## Questions?
 
-Open a [GitHub Discussion](https://github.com/vignesh-jagannadhan/flutter_live_location/discussions)
+Open a [GitHub Discussion](https://github.com/VigneshJagannadhan/flutter_live_location/discussions)
 or file an issue labelled **question**.
 
 ---
 
-*Maintained by [Vignesh Jagannadhan (Vignesh K)](https://github.com/vignesh-jagannadhan).*
+*Maintained by [Vignesh Jagannadhan (Vignesh K)](https://github.com/VigneshJagannadhan).*

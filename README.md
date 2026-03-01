@@ -425,7 +425,7 @@ try {
 ```dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:live_location/live_location.dart';
+import 'package:flutter_live_location/flutter_live_location.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() async {

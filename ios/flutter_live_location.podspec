@@ -6,7 +6,7 @@ Pod::Spec.new do |s|
 A Flutter plugin for real-time location tracking with configurable distance filters
 and time intervals, supporting both foreground and background tracking on Android and iOS.
                        DESC
-  s.homepage         = 'https://github.com/vignesh-jagannadhan/flutter_live_location'
+  s.homepage         = 'https://github.com/VigneshJagannadhan/flutter_live_location'
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Vignesh Jagannadhan' => 'vignesh@stunntech.com' }
   s.source           = { :path => '.' }

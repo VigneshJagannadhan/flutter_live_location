@@ -4,9 +4,9 @@ description: >-
   and distance filters. Supports foreground and background tracking on Android
   and iOS.
 version: 0.1.0
-homepage: https://github.com/vignesh-jagannadhan/flutter_live_location
-repository: https://github.com/vignesh-jagannadhan/flutter_live_location
-issue_tracker: https://github.com/vignesh-jagannadhan/flutter_live_location/issues
+homepage: https://github.com/VigneshJagannadhan/flutter_live_location
+repository: https://github.com/VigneshJagannadhan/flutter_live_location
+issue_tracker: https://github.com/VigneshJagannadhan/flutter_live_location/issues
 
 topics:
   - location
