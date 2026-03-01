@@ -99,7 +99,7 @@ jobs:
           echo "bump=$BUMP"           >> "$GITHUB_OUTPUT"
           echo "New version: $NEW_VERSION  (bump: $BUMP)"
 
-      # ── Update pubspec.yaml ───────────────────────────────────────────────────
+      # ── Prepare local changes (not committed yet) ─────────────────────────────
       - name: Bump version in pubspec.yaml
         if: >
           steps.guard.outputs.skip == 'false' &&
@@ -109,7 +109,6 @@ jobs:
           sed -i "s/^version: .*/version: ${NEW_VERSION}/" pubspec.yaml
           grep '^version:' pubspec.yaml
 
-      # ── Prepend CHANGELOG entry ───────────────────────────────────────────────
       - name: Generate CHANGELOG entry
         if: >
           steps.guard.outputs.skip == 'false' &&
@@ -125,7 +124,6 @@ jobs:
             RAW=$(git log --format="%s" "${LAST_TAG}..HEAD")
           fi
 
-          # Extract features and fixes (empty string if none found).
           FEATS=$(echo "$RAW" | \
             grep -E "^feat(\([^)]+\))?(!)?: " | \
             sed -E 's/^feat(\([^)]+\))?(!)?: /- /' \
@@ -155,24 +153,13 @@ jobs:
           cat /tmp/new_entry.md CHANGELOG.md > /tmp/full_changelog.md
           mv /tmp/full_changelog.md CHANGELOG.md
 
-      # ── Commit, tag, push ─────────────────────────────────────────────────────
-      - name: Commit and push release
-        if: >
-          steps.guard.outputs.skip == 'false' &&
-          steps.release.outputs.skip == 'false'
-        run: |
-          NEW_VERSION="${{ steps.release.outputs.version }}"
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pubspec.yaml CHANGELOG.md
-          git commit -m "chore(release): ${NEW_VERSION}"
-          git tag "v${NEW_VERSION}"
-          git push origin main --follow-tags
-
-      # ── Publish to pub.dev ────────────────────────────────────────────────────
-      # PUB_CREDENTIALS must be set in GitHub Secrets.
-      # Value = the full JSON from ~/.pub-cache/credentials.json on your machine
-      # (run `dart pub publish` locally once to generate it, then copy the file).
+      # ── Publish to pub.dev FIRST ──────────────────────────────────────────────
+      # The git commit and tag only happen AFTER a successful publish.
+      # This ensures GitHub never shows a release that did not actually land on pub.dev.
+      #
+      # PUB_CREDENTIALS: run this on your Mac to get the value:
+      #   security find-generic-password -s "Dart pub credentials" -w
+      # Store the output (without the trailing %) as the PUB_CREDENTIALS secret.
       - name: Install Flutter dependencies
         if: >
           steps.guard.outputs.skip == 'false' &&
@@ -189,3 +176,17 @@ jobs:
           mkdir -p "$HOME/.pub-cache"
           echo "$PUB_CREDENTIALS" > "$HOME/.pub-cache/credentials.json"
           flutter pub publish --force
+
+      # ── Commit, tag, push — only if publish succeeded ─────────────────────────
+      - name: Commit and push release
+        if: >
+          steps.guard.outputs.skip == 'false' &&
+          steps.release.outputs.skip == 'false'
+        run: |
+          NEW_VERSION="${{ steps.release.outputs.version }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pubspec.yaml CHANGELOG.md
+          git commit -m "chore(release): ${NEW_VERSION}"
+          git tag "v${NEW_VERSION}"
+          git push origin main --follow-tags
