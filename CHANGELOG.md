@@ -1,3 +1,9 @@
+## 0.1.0 — 2026-03-01
+
+### Features
+
+- initial release of flutter_live_location
+
 ## 0.0.1
 
 Initial release of `flutter_live_location`.
