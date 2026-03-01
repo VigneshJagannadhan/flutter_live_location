@@ -155,11 +155,13 @@ public class LiveLocationPlugin: NSObject, FlutterPlugin {
             let timeInterval = args["timeIntervalSeconds"] as? Int ?? 2
             let accuracy = args["accuracy"] as? String ?? "high"
             let enableBackground = args["enableBackground"] as? Bool ?? false
+            let distanceFilter = args["distanceFilterMeters"] as? Double ?? 0.0
             locationManager = LocationManager(
                 plugin: self,
                 timeIntervalSeconds: Int32(timeInterval),
                 accuracy: accuracy,
                 enableBackground: enableBackground,
+                distanceFilterMeters: distanceFilter,
                 foregroundEventSink: { [weak self] location in
                     self?.foregroundStreamHandler?.eventSink?(location)
                 },

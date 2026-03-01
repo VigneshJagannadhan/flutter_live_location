@@ -10,6 +10,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     private let timeIntervalSeconds: Int32
     private let accuracy: String
     private let enableBackground: Bool
+    private let distanceFilterMeters: Double
 
     private let foregroundEventSink: ([String: Any?]) -> Void
     private let backgroundEventSink: ([String: Any?]) -> Void
@@ -36,6 +37,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         timeIntervalSeconds: Int32,
         accuracy: String,
         enableBackground: Bool,
+        distanceFilterMeters: Double,
         foregroundEventSink: @escaping ([String: Any?]) -> Void,
         backgroundEventSink: @escaping ([String: Any?]) -> Void,
         onError: @escaping (String, String) -> Void
@@ -43,6 +45,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         self.timeIntervalSeconds = timeIntervalSeconds
         self.accuracy = accuracy
         self.enableBackground = enableBackground
+        self.distanceFilterMeters = distanceFilterMeters
         self.foregroundEventSink = foregroundEventSink
         self.backgroundEventSink = backgroundEventSink
         self.onError = onError
@@ -59,6 +62,12 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
 
         // Set desired accuracy
         locationManager.desiredAccuracy = getAccuracyLevel(from: accuracy)
+
+        // Set native distance filter so the OS suppresses callbacks when the
+        // device has not moved far enough — saves battery compared to a
+        // software-only check.
+        locationManager.distanceFilter =
+            distanceFilterMeters > 0 ? distanceFilterMeters : kCLDistanceFilterNone
 
         // Enable background location updates if requested
         if enableBackground {
