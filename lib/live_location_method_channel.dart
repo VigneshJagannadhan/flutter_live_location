@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import 'flutter_live_location.dart';
+import 'exceptions/location_exceptions.dart';
 import 'live_location_platform_interface.dart';
+import 'models/location_config.dart';
+import 'models/location_update.dart';
 
 /// MethodChannel implementation of LiveLocationPlatform.
 ///
@@ -81,12 +83,17 @@ class MethodChannelLiveLocation extends LiveLocationPlatform {
   }
 
   /// Sets up listeners for EventChannels from native platform.
+  ///
+  /// Parsed [LocationUpdate] objects are delivered via the
+  /// [onForegroundLocation] and [onBackgroundLocation] callbacks set on the
+  /// platform interface by the public API layer. This keeps the method channel
+  /// layer decoupled from the public API singleton.
   void _setupEventChannels() {
     foregroundEventChannel.receiveBroadcastStream().listen(
       (dynamic event) {
         try {
           final location = _locationFromMap(event as Map<dynamic, dynamic>);
-          LiveLocation.instance.emitForegroundLocation(location);
+          onForegroundLocation?.call(location);
         } catch (e) {
           debugPrint('Error parsing foreground location: $e');
         }
@@ -100,7 +107,7 @@ class MethodChannelLiveLocation extends LiveLocationPlatform {
       (dynamic event) {
         try {
           final location = _locationFromMap(event as Map<dynamic, dynamic>);
-          LiveLocation.instance.emitBackgroundLocation(location);
+          onBackgroundLocation?.call(location);
         } catch (e) {
           debugPrint('Error parsing background location: $e');
         }

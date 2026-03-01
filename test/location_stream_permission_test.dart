@@ -23,6 +23,12 @@ class _SuccessMockPlatform
     with MockPlatformInterfaceMixin
     implements LiveLocationPlatform {
   @override
+  void Function(LocationUpdate)? onForegroundLocation;
+
+  @override
+  void Function(LocationUpdate)? onBackgroundLocation;
+
+  @override
   Future<void> initialize({required LocationConfig config}) => Future.value();
 
   @override
@@ -48,6 +54,12 @@ class _SuccessMockPlatform
 class _PermissionDeniedMockPlatform
     with MockPlatformInterfaceMixin
     implements LiveLocationPlatform {
+  @override
+  void Function(LocationUpdate)? onForegroundLocation;
+
+  @override
+  void Function(LocationUpdate)? onBackgroundLocation;
+
   @override
   Future<void> initialize({required LocationConfig config}) => Future.value();
 
@@ -117,7 +129,7 @@ void main() {
       final sub =
           LiveLocation.instance.foregroundLocationStream.listen(received.add);
 
-      LiveLocation.instance.emitForegroundLocation(_foregroundUpdate);
+      LiveLocationPlatform.instance.onForegroundLocation?.call(_foregroundUpdate);
       await Future.microtask(() {});
 
       expect(received, hasLength(1));
@@ -138,7 +150,7 @@ void main() {
       final sub2 =
           LiveLocation.instance.foregroundLocationStream.listen(second.add);
 
-      LiveLocation.instance.emitForegroundLocation(_foregroundUpdate);
+      LiveLocationPlatform.instance.onForegroundLocation?.call(_foregroundUpdate);
       await Future.microtask(() {});
 
       expect(first, hasLength(1));
@@ -153,7 +165,7 @@ void main() {
 
       expect(LiveLocation.instance.lastKnownLocation, isNull);
 
-      LiveLocation.instance.emitForegroundLocation(_foregroundUpdate);
+      LiveLocationPlatform.instance.onForegroundLocation?.call(_foregroundUpdate);
       await Future.microtask(() {});
 
       expect(
@@ -188,7 +200,7 @@ void main() {
       final sub =
           LiveLocation.instance.backgroundLocationStream.listen(received.add);
 
-      LiveLocation.instance.emitBackgroundLocation(_backgroundUpdate);
+      LiveLocationPlatform.instance.onBackgroundLocation?.call(_backgroundUpdate);
       await Future.microtask(() {});
 
       expect(received, hasLength(1));
@@ -201,7 +213,7 @@ void main() {
     test('caches the last background update in lastKnownLocation', () async {
       await LiveLocation.initialize(config: _config(background: true));
 
-      LiveLocation.instance.emitBackgroundLocation(_backgroundUpdate);
+      LiveLocationPlatform.instance.onBackgroundLocation?.call(_backgroundUpdate);
       await Future.microtask(() {});
 
       expect(
@@ -215,8 +227,8 @@ void main() {
       () async {
         await LiveLocation.initialize(config: _config(background: true));
 
-        LiveLocation.instance.emitForegroundLocation(_foregroundUpdate);
-        LiveLocation.instance.emitBackgroundLocation(_backgroundUpdate);
+        LiveLocationPlatform.instance.onForegroundLocation?.call(_foregroundUpdate);
+        LiveLocationPlatform.instance.onBackgroundLocation?.call(_backgroundUpdate);
         await Future.microtask(() {});
 
         // The most recent emission wins.
