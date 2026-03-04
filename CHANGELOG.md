@@ -1,3 +1,20 @@
+## 0.6.0 — 2026-03-04
+
+### Features
+
+- initial release of flutter_live_location
+
+### Bug Fixes
+
+- workflow fixes
+- Distance and time filters fixed
+- critical bug fixes
+- critical bug fixes
+- write pub credentials to both paths and validate JSON structure
+- harden pub.dev credentials write and add empty-secret guard
+- publish before committing release to prevent false releases
+- correct GitHub URLs and README import
+
 ## 0.5.0 — 2026-03-01
 
 ### Features
