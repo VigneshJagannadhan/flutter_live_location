@@ -57,6 +57,16 @@ class MethodChannelLiveLocation extends LiveLocationPlatform {
       // Set up event channel listeners
       _setupEventChannels();
     } on PlatformException catch (e) {
+      if (e.code == 'LOCATION_SERVICE_DISABLED') {
+        throw LocationServiceDisabledException(
+          message: e.message ?? 'Location services are disabled',
+        );
+      }
+      if (e.code == 'INIT_TIMEOUT') {
+        throw LocationInitTimeoutException(
+          message: e.message ?? 'Location provider initialization timed out',
+        );
+      }
       throw LocationPlatformException(
         message: e.message ?? 'Platform initialization failed',
         code: e.code,

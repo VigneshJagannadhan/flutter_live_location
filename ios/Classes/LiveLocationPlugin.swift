@@ -142,6 +142,16 @@ public class LiveLocationPlugin: NSObject, FlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ) {
+        guard CLLocationManager.locationServicesEnabled() else {
+            result(FlutterError(
+                code: "LOCATION_SERVICE_DISABLED",
+                message: "Location services are disabled on this device. " +
+                    "Enable location in Settings > Privacy > Location Services.",
+                details: nil
+            ))
+            return
+        }
+
         guard let args = call.arguments as? [String: Any] else {
             result(FlutterError(
                 code: "INVALID_ARGS",

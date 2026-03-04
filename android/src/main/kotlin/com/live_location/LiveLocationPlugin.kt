@@ -131,6 +131,18 @@ class LiveLocationPlugin : FlutterPlugin, ActivityAware {
 
     private fun initialize(call: io.flutter.plugin.common.MethodCall, result: io.flutter.plugin.common.MethodChannel.Result) {
         try {
+            val sysLocationManager = context.getSystemService(Context.LOCATION_SERVICE)
+                as android.location.LocationManager
+            if (!sysLocationManager.isLocationEnabled) {
+                result.error(
+                    "LOCATION_SERVICE_DISABLED",
+                    "Location services are disabled on this device. " +
+                        "Enable location in device settings before initializing.",
+                    null
+                )
+                return
+            }
+
             val timeInterval = (call.argument<Number>("timeIntervalSeconds") ?: 2).toInt()
             val accuracy = call.argument<String>("accuracy") ?: "high"
             val enableBackground = call.argument<Boolean>("enableBackground") ?: false

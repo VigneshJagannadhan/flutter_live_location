@@ -94,3 +94,16 @@ class LocationPlatformNotSupportedException extends LocationException {
     String message = 'Operation not supported on this platform',
   }) : super(message);
 }
+
+/// Thrown when the location provider does not become ready within the timeout.
+///
+/// Most commonly occurs on emulators without GPS hardware, or devices where
+/// location services are unresponsive. Ensure location services are enabled
+/// and the device has GPS hardware.
+class LocationInitTimeoutException extends LocationException {
+  LocationInitTimeoutException({
+    String message =
+        'Location provider initialization timed out. '
+        'Ensure the device has GPS hardware and location services are enabled.',
+  }) : super(message);
+}
