@@ -35,3 +35,4 @@ migrate_working_dir/
 # Custom ignore rules
 .claude
 .agents
+.github/instructions

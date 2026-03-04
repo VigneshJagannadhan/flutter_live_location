@@ -8,6 +8,13 @@ on:
 permissions:
   contents: write
 
+# Prevent two release runs from racing each other.
+# If a second push lands while a release is in progress, cancel the older run
+# and let the newer one (which includes both sets of commits) take over.
+concurrency:
+  group: release
+  cancel-in-progress: true
+
 jobs:
   release:
     name: Auto Release
@@ -150,6 +157,8 @@ jobs:
             fi
           } > /tmp/new_entry.md
 
+          # Prepend to CHANGELOG.md, creating it if it doesn't yet exist.
+          touch CHANGELOG.md
           cat /tmp/new_entry.md CHANGELOG.md > /tmp/full_changelog.md
           mv /tmp/full_changelog.md CHANGELOG.md
 
@@ -213,5 +222,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add pubspec.yaml CHANGELOG.md
           git commit -m "chore(release): ${NEW_VERSION}"
-          git tag "v${NEW_VERSION}"
+          git tag -a "v${NEW_VERSION}" -m "Release ${NEW_VERSION}"
           git push origin main --follow-tags
