@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'exceptions/location_exceptions.dart';
 import 'live_location_platform_interface.dart';
 import 'models/location_config.dart';
+import 'models/location_permission_status.dart';
 import 'models/location_update.dart';
 
 /// MethodChannel implementation of LiveLocationPlatform.
@@ -177,6 +178,63 @@ class MethodChannelLiveLocation extends LiveLocationPlatform {
       methodChannel.invokeMethod('onStreamCancelled');
     } catch (e) {
       debugPrint('Error calling onStreamCancelled: $e');
+    }
+  }
+
+  @override
+  Future<LocationPermissionStatus> checkPermission() async {
+    try {
+      final status =
+          await methodChannel.invokeMethod<String>('checkPermission');
+      return _permissionStatusFromString(status);
+    } on PlatformException catch (e) {
+      throw LocationPlatformException(
+        message: e.message ?? 'Failed to check permission',
+        code: e.code,
+      );
+    }
+  }
+
+  @override
+  Future<LocationPermissionStatus> requestPermission() async {
+    try {
+      final status =
+          await methodChannel.invokeMethod<String>('requestPermission');
+      return _permissionStatusFromString(status);
+    } on PlatformException catch (e) {
+      throw LocationPlatformException(
+        message: e.message ?? 'Failed to request permission',
+        code: e.code,
+      );
+    }
+  }
+
+  @override
+  Future<bool> checkLocationServiceEnabled() async {
+    try {
+      final enabled = await methodChannel.invokeMethod<bool>(
+        'checkLocationServiceEnabled',
+      );
+      return enabled ?? false;
+    } on PlatformException catch (e) {
+      throw LocationPlatformException(
+        message: e.message ?? 'Failed to check location service',
+        code: e.code,
+      );
+    }
+  }
+
+  /// Maps the string returned by the native layer to [LocationPermissionStatus].
+  static LocationPermissionStatus _permissionStatusFromString(String? status) {
+    switch (status) {
+      case 'granted':
+        return LocationPermissionStatus.granted;
+      case 'deniedForever':
+        return LocationPermissionStatus.deniedForever;
+      case 'restricted':
+        return LocationPermissionStatus.restricted;
+      default:
+        return LocationPermissionStatus.denied;
     }
   }
 

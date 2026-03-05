@@ -13,11 +13,13 @@ import 'package:flutter/foundation.dart';
 import 'exceptions/location_exceptions.dart';
 import 'live_location_platform_interface.dart';
 import 'models/location_config.dart';
+import 'models/location_permission_status.dart';
 import 'models/location_update.dart';
 
 // Export public API
 export 'models/location_accuracy.dart';
 export 'models/location_config.dart';
+export 'models/location_permission_status.dart';
 export 'models/location_update.dart';
 export 'exceptions/location_exceptions.dart';
 
@@ -210,6 +212,36 @@ class LiveLocation {
 
   /// Whether location tracking is currently active.
   bool get isTracking => _isTracking;
+
+  /// Returns the current location permission status without prompting the user.
+  ///
+  /// Throws [LocationNotInitializedException] if not initialized.
+  Future<LocationPermissionStatus> checkPermission() async {
+    _checkInitializedAndNotDisposed();
+    return _platform.checkPermission();
+  }
+
+  /// Requests location permission from the user.
+  ///
+  /// Shows the system permission dialog if the status is not permanently
+  /// denied. Returns the resulting [LocationPermissionStatus].
+  ///
+  /// Throws [LocationNotInitializedException] if not initialized.
+  Future<LocationPermissionStatus> requestPermission() async {
+    _checkInitializedAndNotDisposed();
+    return _platform.requestPermission();
+  }
+
+  /// Returns true if the device's location services are currently enabled.
+  ///
+  /// Location services can be disabled globally in device Settings regardless
+  /// of whether the app has permission. Check this before starting tracking.
+  ///
+  /// Throws [LocationNotInitializedException] if not initialized.
+  Future<bool> checkLocationServiceEnabled() async {
+    _checkInitializedAndNotDisposed();
+    return _platform.checkLocationServiceEnabled();
+  }
 
   /// Starts location tracking for the specified duration.
   ///

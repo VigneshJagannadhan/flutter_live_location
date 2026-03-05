@@ -2,6 +2,7 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'live_location_method_channel.dart';
 import 'models/location_config.dart';
+import 'models/location_permission_status.dart';
 import 'models/location_update.dart';
 
 /// Abstract platform interface for live location tracking.
@@ -80,6 +81,29 @@ abstract class LiveLocationPlatform extends PlatformInterface {
   /// Used to optimize battery by stopping updates when not needed.
   void onStreamCancelled() {
     throw UnimplementedError('onStreamCancelled() has not been implemented.');
+  }
+
+  /// Returns the current location permission status without prompting the user.
+  Future<LocationPermissionStatus> checkPermission() async {
+    throw UnimplementedError('checkPermission() has not been implemented.');
+  }
+
+  /// Requests location permission from the user.
+  ///
+  /// Shows the system permission dialog if the permission has not been
+  /// permanently denied. Returns the resulting [LocationPermissionStatus].
+  Future<LocationPermissionStatus> requestPermission() async {
+    throw UnimplementedError('requestPermission() has not been implemented.');
+  }
+
+  /// Returns true if the device's location services are currently enabled.
+  ///
+  /// This is independent of app-level permission — the user may have location
+  /// permission granted but still have location services turned off globally.
+  Future<bool> checkLocationServiceEnabled() async {
+    throw UnimplementedError(
+      'checkLocationServiceEnabled() has not been implemented.',
+    );
   }
 
   /// Disposes the platform-specific resources.
