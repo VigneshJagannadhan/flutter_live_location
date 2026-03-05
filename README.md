@@ -152,8 +152,9 @@ If you use background tracking, also enable the **Background Modes** capability 
 
 ## Handling Permissions
 
-> This is the part most developers get stuck on. Follow these steps and you will have no
-> permission issues.
+> This section is included as a complete reference so that this README is the only document
+> you need to integrate the plugin — no external guides required. If you are already familiar
+> with Flutter permission handling, feel free to skip ahead.
 
 The recommended approach is to use the
 [`permission_handler`](https://pub.dev/packages/permission_handler) package alongside this plugin.
