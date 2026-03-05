@@ -205,8 +205,14 @@ public class LiveLocationPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         do {
-            locationManager?.startTracking()
+            try locationManager?.startTracking()
             result(nil)
+        } catch LocationError.permissionDenied {
+            result(FlutterError(
+                code: "PERMISSION_DENIED",
+                message: "Location permission not granted",
+                details: nil
+            ))
         } catch {
             result(FlutterError(
                 code: "START_TRACKING_ERROR",

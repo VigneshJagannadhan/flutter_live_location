@@ -2,6 +2,11 @@ import CoreLocation
 import Foundation
 import UIKit
 
+/// Errors thrown by LocationManager.
+enum LocationError: Error {
+    case permissionDenied
+}
+
 /// Manages location updates using CLLocationManager on iOS.
 ///
 /// Handles location delegate callbacks, filtering, and background tracking.
@@ -129,10 +134,11 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
 
     // MARK: - Tracking Control
 
-    func startTracking() {
+    func startTracking() throws {
         if isTracking { return }
 
-        // Check and request permissions
+        // Check permissions — throw so the caller receives a FlutterError
+        // instead of a silent success.
         let status: CLAuthorizationStatus
         if #available(iOS 14.0, *) {
             status = locationManager.authorizationStatus
@@ -144,8 +150,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         case .authorizedWhenInUse, .authorizedAlways:
             break
         default:
-            onError("PERMISSION_DENIED", "Location permission not granted")
-            return
+            throw LocationError.permissionDenied
         }
 
         locationManager.startUpdatingLocation()
