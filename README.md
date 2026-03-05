@@ -620,6 +620,60 @@ release builds), or sent anywhere by the plugin.
 
 ---
 
+## Known Issues & Planned Improvements
+
+This package is actively developed. Below is an honest list of current limitations and areas
+where the code can be improved. Contributions to any of these are very welcome.
+
+### Known Issues
+
+- **iOS Simulator not supported** — `CLLocationManager` does not fire continuous
+  `didUpdateLocations` callbacks in the simulator. See the notice at the top of this file.
+  A mock-injection path is planned for a future release.
+
+- **Platform errors are not surfaced to the stream** — if a native location error occurs
+  after tracking has started (e.g. the user revokes permission mid-session), it is currently
+  logged in debug mode only. It does not reach the Dart side as a typed exception. A proper
+  error stream or `onError` callback is planned.
+
+### Tech Debt / Planned Improvements
+
+- **No native permission API** — the plugin does not expose `checkPermission()`,
+  `requestPermission()`, or `checkLocationServiceEnabled()` as first-class methods. You
+  currently need `permission_handler` for this. Native wrappers for these are planned so the
+  plugin is self-contained.
+
+- **No `LocationConfig.copyWith()`** — there is no convenience method to create a modified
+  copy of a config. This makes re-initializing with slightly different settings more verbose
+  than it needs to be.
+
+- **`PermissionStatus` not re-exported** — the package imports `PermissionStatus` internally
+  but does not re-export it from the main library barrel, so consumers that need to reference
+  the type must import it separately.
+
+- **iOS significant-location-change mode is not yet wired** — `CLLocationManager` supports a
+  lower-power "significant change" mode that is useful for apps that only need coarse position
+  awareness. The infrastructure exists in the native layer but is not yet exposed via
+  `LocationConfig`.
+
+- **No integration tests** — only unit tests exist. Integration tests on a real device or
+  emulator would significantly improve confidence in the native layers.
+
+---
+
+## About This Project
+
+I built this plugin as an alternative to location packages that require a paid licence to
+support the features I needed for one of my personal projects. Once it was working I decided
+to publish it so that anyone in the same situation could make use of it.
+
+I am sharing this with the community in the hope that developers who find it useful can help
+make it better for everyone. If you have more knowledge of Flutter plugins, native Android,
+or native iOS than I do — and many of you will — your contributions, suggestions, or even
+just opening an issue with feedback would be genuinely appreciated.
+
+---
+
 ## Author
 
 Created by **Vignesh Jagannadhan (Vignesh K)**.
@@ -634,5 +688,6 @@ MIT — see the [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening
-a pull request.
+Contributions are welcome — whether that is a bug fix, a feature from the roadmap above, an
+improvement to the native layers, or simply a suggestion. Please read
+[CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
