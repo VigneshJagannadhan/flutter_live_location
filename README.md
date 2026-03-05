@@ -5,40 +5,72 @@ filters — supporting both **foreground and background** tracking on Android an
 
 ---
 
+## ⚠️ Emulator & Simulator Testing
+
+> **Android emulator — works fully.**
+> Use the **Extended Controls → Location** panel in Android Studio (or `geo fix <lon> <lat>` in
+> the emulator console) to simulate GPS coordinates and live movement. All plugin features work
+> as expected.
+
+> **iOS Simulator — not supported in the current version.**
+> The iOS Simulator does not fire continuous `didUpdateLocations` callbacks from
+> `CLLocationManager` the way a real device does. The simulator delivers a single static GPS fix
+> but does not stream repeated updates, so the plugin's foreground and background streams
+> produce no output. This is a known limitation of how `CLLocationManager` behaves in the
+> simulated environment — it is not a configuration problem.
+>
+> **What we are working on:** A future release will add a simulator-specific path that injects
+> mock location updates directly from the Dart side, allowing you to write and run location-driven
+> tests entirely in the iOS Simulator without a physical device.
+>
+> Until then, **test on a physical iOS device** for any location functionality.
+
+---
+
 ## Why live_location?
 
 Most location packages require a lot of boilerplate and confusing setup. `live_location` gets you
-streaming GPS updates in **under 10 lines of code**:
+streaming GPS updates in **under 15 lines of code**:
 
 ```dart
 await LiveLocation.initialize(
   config: LocationConfig(
     timeIntervalSeconds: 2,
     accuracy: LocationAccuracy.high,
-    enableBackground: false,
+    enableBackground: true,
+    distanceFilterMeters: 5,   // only emit if moved ≥ 5 m
   ),
 );
 
+// Foreground updates — while app is visible
 LiveLocation.instance.foregroundLocationStream.listen((location) {
-  print('${location.latitude}, ${location.longitude}');
+  print('Foreground: ${location.latitude}, ${location.longitude}');
+});
+
+// Background updates — while app is in the background
+LiveLocation.instance.backgroundLocationStream.listen((location) {
+  print('Background: ${location.latitude}, ${location.longitude}');
 });
 
 await LiveLocation.instance.startLocationUpdates(Duration(minutes: 5));
 ```
 
-That's it. No manual channel setup, no confusing callbacks — just a clean Dart stream.
+That's it. No manual channel setup, no confusing callbacks — just clean Dart streams.
 
 ---
 
 ## Features
 
-- Real-time location updates via a simple broadcast stream
-- Configurable time interval and distance filter
+- Real-time location updates via two separate broadcast streams — one for foreground, one for background
+- Configurable time interval (`timeIntervalSeconds`) between updates
+- Configurable distance filter (`distanceFilterMeters`) — native OS-level filtering, no wasted wake-ups
 - Foreground and background tracking
 - Android foreground service (required by Android OS for background location)
 - iOS background location mode support
+- Built-in `distanceTo()` on `LocationUpdate` for Haversine distance calculation between two points
 - Structured error handling with typed exceptions
 - Automatically stops tracking after a configurable duration
+- Last known location cache (`lastKnownLocation`)
 - Zero dependencies beyond Flutter and `plugin_platform_interface`
 
 ---
@@ -49,7 +81,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_live_location: ^0.0.1
+  flutter_live_location: ^0.6.1
   permission_handler: ^12.0.1  # Recommended for handling permissions
 ```
 
@@ -120,8 +152,9 @@ If you use background tracking, also enable the **Background Modes** capability 
 
 ## Handling Permissions
 
-> This is the part most developers get stuck on. Follow these steps and you will have no
-> permission issues.
+> This section is included as a complete reference so that this README is the only document
+> you need to integrate the plugin — no external guides required. If you are already familiar
+> with Flutter permission handling, feel free to skip ahead.
 
 The recommended approach is to use the
 [`permission_handler`](https://pub.dev/packages/permission_handler) package alongside this plugin.
@@ -241,14 +274,20 @@ void main() async {
 }
 ```
 
-### 2 — Listen to the stream
+### 2 — Listen to the streams
 
-Set up your listener *before* you start tracking so you don't miss any updates:
+Set up your listeners *before* you start tracking so you don't miss any updates:
 
 ```dart
+// Foreground — fires while the app is visible
 LiveLocation.instance.foregroundLocationStream.listen((location) {
   print('Lat: ${location.latitude}, Lng: ${location.longitude}');
   print('Accuracy: ${location.accuracy} m');
+});
+
+// Background — fires while the app is backgrounded (requires enableBackground: true)
+LiveLocation.instance.backgroundLocationStream.listen((location) {
+  print('Background lat: ${location.latitude}, lng: ${location.longitude}');
 });
 ```
 
@@ -312,11 +351,12 @@ LiveLocation.instance.backgroundLocationStream.listen((location) {
 
 ### LocationConfig
 
-| Parameter | Type | Description |
-|---|---|---|
-| `timeIntervalSeconds` | `int` | Minimum seconds between location updates. Must be > 0. |
-| `accuracy` | `LocationAccuracy` | Desired GPS accuracy level. |
-| `enableBackground` | `bool` | Whether to continue tracking when the app is backgrounded. |
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `timeIntervalSeconds` | `int` | required | Minimum seconds between location updates. Must be > 0. |
+| `accuracy` | `LocationAccuracy` | required | Desired GPS accuracy level. |
+| `enableBackground` | `bool` | required | Whether to continue tracking when the app is backgrounded. |
+| `distanceFilterMeters` | `double` | `0` | Minimum metres the device must move before an update is emitted. `0` disables distance filtering. Forwarded directly to the native provider — the OS suppresses redundant wake-ups. |
 
 ### LocationAccuracy
 
@@ -358,11 +398,20 @@ await LiveLocation.instance.dispose();
 ### Streams
 
 ```dart
-// Foreground updates (app is visible)
+// Foreground updates — app is visible
 LiveLocation.instance.foregroundLocationStream  // Stream<LocationUpdate>
 
-// Background updates (app is in the background, requires enableBackground: true)
+// Background updates — app is in the background (requires enableBackground: true)
 LiveLocation.instance.backgroundLocationStream  // Stream<LocationUpdate>
+```
+
+Both are broadcast streams — multiple listeners are supported.
+
+### LocationUpdate methods
+
+```dart
+// Haversine great-circle distance in metres between two LocationUpdate points
+final metres = locationA.distanceTo(locationB);
 ```
 
 ### LocationUpdate fields
@@ -435,7 +484,8 @@ void main() async {
     config: LocationConfig(
       timeIntervalSeconds: 2,
       accuracy: LocationAccuracy.high,
-      enableBackground: false,
+      enableBackground: true,
+      distanceFilterMeters: 5, // only emit if moved ≥ 5 m
     ),
   );
 
@@ -451,12 +501,16 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   LocationUpdate? _lastLocation;
   bool _isTracking = false;
-  StreamSubscription<LocationUpdate>? _subscription;
+  StreamSubscription<LocationUpdate>? _fgSubscription;
+  StreamSubscription<LocationUpdate>? _bgSubscription;
 
   @override
   void initState() {
     super.initState();
-    _subscription = LiveLocation.instance.foregroundLocationStream.listen(
+    _fgSubscription = LiveLocation.instance.foregroundLocationStream.listen(
+      (location) => setState(() => _lastLocation = location),
+    );
+    _bgSubscription = LiveLocation.instance.backgroundLocationStream.listen(
       (location) => setState(() => _lastLocation = location),
     );
   }
@@ -476,7 +530,8 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
-    _subscription?.cancel();
+    _fgSubscription?.cancel();
+    _bgSubscription?.cancel();
     LiveLocation.instance.dispose();
     super.dispose();
   }
@@ -538,10 +593,12 @@ Android kills background processes aggressively. Check:
 
 ---
 
-**Q: No location in the iOS Simulator.**
+**Q: No location updates in the iOS Simulator.**
 
-Use the built-in simulation: **Features → Location** in the Simulator menu and pick a
-preset or enter custom coordinates.
+The iOS Simulator does not support continuous `CLLocationManager` updates in the current
+version. See the **Emulator & Simulator Testing** section at the top of this file for a full
+explanation and workaround. Use a physical iOS device for location testing until the
+simulator support is added.
 
 ---
 
@@ -563,6 +620,60 @@ release builds), or sent anywhere by the plugin.
 
 ---
 
+## Known Issues & Planned Improvements
+
+This package is actively developed. Below is an honest list of current limitations and areas
+where the code can be improved. Contributions to any of these are very welcome.
+
+### Known Issues
+
+- **iOS Simulator not supported** — `CLLocationManager` does not fire continuous
+  `didUpdateLocations` callbacks in the simulator. See the notice at the top of this file.
+  A mock-injection path is planned for a future release.
+
+- **Platform errors are not surfaced to the stream** — if a native location error occurs
+  after tracking has started (e.g. the user revokes permission mid-session), it is currently
+  logged in debug mode only. It does not reach the Dart side as a typed exception. A proper
+  error stream or `onError` callback is planned.
+
+### Tech Debt / Planned Improvements
+
+- **No native permission API** — the plugin does not expose `checkPermission()`,
+  `requestPermission()`, or `checkLocationServiceEnabled()` as first-class methods. You
+  currently need `permission_handler` for this. Native wrappers for these are planned so the
+  plugin is self-contained.
+
+- **No `LocationConfig.copyWith()`** — there is no convenience method to create a modified
+  copy of a config. This makes re-initializing with slightly different settings more verbose
+  than it needs to be.
+
+- **`PermissionStatus` not re-exported** — the package imports `PermissionStatus` internally
+  but does not re-export it from the main library barrel, so consumers that need to reference
+  the type must import it separately.
+
+- **iOS significant-location-change mode is not yet wired** — `CLLocationManager` supports a
+  lower-power "significant change" mode that is useful for apps that only need coarse position
+  awareness. The infrastructure exists in the native layer but is not yet exposed via
+  `LocationConfig`.
+
+- **No integration tests** — only unit tests exist. Integration tests on a real device or
+  emulator would significantly improve confidence in the native layers.
+
+---
+
+## About This Project
+
+I built this plugin as an alternative to location packages that require a paid licence to
+support the features I needed for one of my personal projects. Once it was working I decided
+to publish it so that anyone in the same situation could make use of it.
+
+I am sharing this with the community in the hope that developers who find it useful can help
+make it better for everyone. If you have more knowledge of Flutter plugins, native Android,
+or native iOS than I do — and many of you will — your contributions, suggestions, or even
+just opening an issue with feedback would be genuinely appreciated.
+
+---
+
 ## Author
 
 Created by **Vignesh Jagannadhan (Vignesh K)**.
@@ -577,5 +688,6 @@ MIT — see the [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening
-a pull request.
+Contributions are welcome — whether that is a bug fix, a feature from the roadmap above, an
+improvement to the native layers, or simply a suggestion. Please read
+[CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
