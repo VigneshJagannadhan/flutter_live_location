@@ -138,6 +138,11 @@ class MethodChannelLiveLocation extends LiveLocationPlatform {
         'timeIntervalSeconds': config.timeIntervalSeconds,
       });
     } on PlatformException catch (e) {
+      if (e.code == 'PERMISSION_DENIED') {
+        throw LocationPermissionException(
+          message: e.message ?? 'Location permission not granted',
+        );
+      }
       throw LocationPlatformException(
         message: e.message ?? 'Failed to start tracking',
         code: e.code,

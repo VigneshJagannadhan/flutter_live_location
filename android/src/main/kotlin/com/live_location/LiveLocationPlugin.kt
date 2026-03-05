@@ -175,6 +175,8 @@ class LiveLocationPlugin : FlutterPlugin, ActivityAware {
         try {
             locationManager?.startTracking()
             result.success(null)
+        } catch (e: SecurityException) {
+            result.error("PERMISSION_DENIED", e.message, null)
         } catch (e: Exception) {
             result.error("START_TRACKING_ERROR", e.message, null)
         }

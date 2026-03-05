@@ -115,7 +115,8 @@ class LocationManager(
             return
         }
 
-        // Check permissions
+        // Check permissions — throw so the caller receives a PlatformException
+        // instead of a silent success.
         if (ActivityCompat.checkSelfPermission(
                 context,
                 Manifest.permission.ACCESS_FINE_LOCATION
@@ -125,8 +126,7 @@ class LocationManager(
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            onError("PERMISSION_DENIED", "Location permission not granted")
-            return
+            throw SecurityException("Location permission not granted")
         }
 
         try {
