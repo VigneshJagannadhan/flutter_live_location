@@ -5,6 +5,28 @@ filters — supporting both **foreground and background** tracking on Android an
 
 ---
 
+## ⚠️ Emulator & Simulator Testing
+
+> **Android emulator — works fully.**
+> Use the **Extended Controls → Location** panel in Android Studio (or `geo fix <lon> <lat>` in
+> the emulator console) to simulate GPS coordinates and live movement. All plugin features work
+> as expected.
+
+> **iOS Simulator — not supported in the current version.**
+> The iOS Simulator does not fire continuous `didUpdateLocations` callbacks from
+> `CLLocationManager` the way a real device does. The simulator delivers a single static GPS fix
+> but does not stream repeated updates, so the plugin's foreground and background streams
+> produce no output. This is a known limitation of how `CLLocationManager` behaves in the
+> simulated environment — it is not a configuration problem.
+>
+> **What we are working on:** A future release will add a simulator-specific path that injects
+> mock location updates directly from the Dart side, allowing you to write and run location-driven
+> tests entirely in the iOS Simulator without a physical device.
+>
+> Until then, **test on a physical iOS device** for any location functionality.
+
+---
+
 ## Why live_location?
 
 Most location packages require a lot of boilerplate and confusing setup. `live_location` gets you
