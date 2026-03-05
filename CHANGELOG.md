@@ -1,3 +1,9 @@
+## 0.6.2 — 2026-03-05
+
+### Bug Fixes
+
+- throw LocationPermissionException when startTracking is called without permission instead of silently succeeding
+
 ## 0.6.1 — 2026-03-04
 
 ### Bug Fixes
