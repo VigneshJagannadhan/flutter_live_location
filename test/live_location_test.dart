@@ -29,6 +29,17 @@ class MockLiveLocationPlatform
   void onStreamCancelled() {}
 
   @override
+  Future<LocationPermissionStatus> checkPermission() =>
+      Future.value(LocationPermissionStatus.granted);
+
+  @override
+  Future<LocationPermissionStatus> requestPermission() =>
+      Future.value(LocationPermissionStatus.granted);
+
+  @override
+  Future<bool> checkLocationServiceEnabled() => Future.value(true);
+
+  @override
   Future<void> dispose() => Future.value();
 }
 

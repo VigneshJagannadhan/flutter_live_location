@@ -53,7 +53,7 @@ private class BackgroundLocationStreamHandler: NSObject, FlutterStreamHandler {
 ///
 /// Manages the lifecycle of location tracking, permissions, and communication
 /// with the Dart layer via method and event channels.
-public class LiveLocationPlugin: NSObject, FlutterPlugin {
+public class LiveLocationPlugin: NSObject, FlutterPlugin, CLLocationManagerDelegate {
     static let METHOD_CHANNEL = "com.flutter_live_location/methods"
     static let FOREGROUND_EVENT_CHANNEL = "com.flutter_live_location/foreground_locations"
     static let BACKGROUND_EVENT_CHANNEL = "com.flutter_live_location/background_locations"
@@ -65,6 +65,11 @@ public class LiveLocationPlugin: NSObject, FlutterPlugin {
     private var locationManager: LocationManager?
     fileprivate var foregroundStreamHandler: ForegroundLocationStreamHandler?
     fileprivate var backgroundStreamHandler: BackgroundLocationStreamHandler?
+
+    /// Dedicated CLLocationManager used only for permission requests.
+    private var permissionManager: CLLocationManager?
+    /// Pending FlutterResult waiting for the permission dialog response.
+    private var pendingPermissionResult: FlutterResult?
 
 
     public static func dummyMethodToEnforceBundling() {
@@ -124,13 +129,18 @@ public class LiveLocationPlugin: NSObject, FlutterPlugin {
             startTracking(call, result: result)
         case "stopTracking":
             stopTracking(result: result)
-
         case "onStreamListened":
             locationManager?.onStreamListened()
             result(nil)
         case "onStreamCancelled":
             locationManager?.onStreamCancelled()
             result(nil)
+        case "checkPermission":
+            checkPermission(result: result)
+        case "requestPermission":
+            requestPermission(result: result)
+        case "checkLocationServiceEnabled":
+            checkLocationServiceEnabled(result: result)
         case "dispose":
             dispose(result: result)
         default:
@@ -235,7 +245,89 @@ public class LiveLocationPlugin: NSObject, FlutterPlugin {
         }
     }
 
+    private func checkPermission(result: @escaping FlutterResult) {
+        result(permissionStatusString(currentAuthorizationStatus()))
+    }
 
+    private func requestPermission(result: @escaping FlutterResult) {
+        let status = currentAuthorizationStatus()
+        switch status {
+        case .authorizedWhenInUse, .authorizedAlways:
+            result("granted")
+        case .restricted:
+            result("restricted")
+        case .denied:
+            // iOS cannot re-prompt after denial; user must go to Settings.
+            result("deniedForever")
+        case .notDetermined:
+            pendingPermissionResult = result
+            permissionManager = CLLocationManager()
+            permissionManager?.delegate = self
+            permissionManager?.requestWhenInUseAuthorization()
+        @unknown default:
+            result("denied")
+        }
+    }
+
+    private func checkLocationServiceEnabled(result: @escaping FlutterResult) {
+        result(CLLocationManager.locationServicesEnabled())
+    }
+
+    // MARK: - CLLocationManagerDelegate (permission callbacks)
+
+    public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        // iOS 14+
+        guard manager === permissionManager else { return }
+        guard let pending = pendingPermissionResult else { return }
+        pendingPermissionResult = nil
+        permissionManager = nil
+        if #available(iOS 14.0, *) {
+            pending(permissionStatusString(manager.authorizationStatus))
+        } else {
+            pending(permissionStatusString(CLLocationManager.authorizationStatus()))
+        }
+    }
+
+    public func locationManager(
+        _ manager: CLLocationManager,
+        didChangeAuthorization status: CLAuthorizationStatus
+    ) {
+        // iOS < 14
+        guard manager === permissionManager else { return }
+        guard let pending = pendingPermissionResult else { return }
+        pendingPermissionResult = nil
+        permissionManager = nil
+        pending(permissionStatusString(status))
+    }
+
+    // MARK: - Helpers
+
+    /// Returns the current CLAuthorizationStatus using the non-deprecated API on iOS 14+.
+    private func currentAuthorizationStatus() -> CLAuthorizationStatus {
+        if #available(iOS 14.0, *) {
+            // Use a temporary manager to read the instance-level authorizationStatus
+            // to avoid the deprecated class method.
+            return CLLocationManager().authorizationStatus
+        } else {
+            return CLLocationManager.authorizationStatus()
+        }
+    }
+
+    /// Maps a CLAuthorizationStatus to the string expected by the Dart layer.
+    private func permissionStatusString(_ status: CLAuthorizationStatus) -> String {
+        switch status {
+        case .authorizedWhenInUse, .authorizedAlways:
+            return "granted"
+        case .notDetermined:
+            return "denied"
+        case .denied:
+            return "deniedForever"
+        case .restricted:
+            return "restricted"
+        @unknown default:
+            return "denied"
+        }
+    }
 
     private func dispose(result: @escaping FlutterResult) {
         do {
@@ -258,6 +350,4 @@ public class LiveLocationPlugin: NSObject, FlutterPlugin {
             arguments: ["code": code, "message": message]
         )
     }
-
-
 }
