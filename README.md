@@ -30,37 +30,47 @@ filters — supporting both **foreground and background** tracking on Android an
 ## Why live_location?
 
 Most location packages require a lot of boilerplate and confusing setup. `live_location` gets you
-streaming GPS updates in **under 10 lines of code**:
+streaming GPS updates in **under 15 lines of code**:
 
 ```dart
 await LiveLocation.initialize(
   config: LocationConfig(
     timeIntervalSeconds: 2,
     accuracy: LocationAccuracy.high,
-    enableBackground: false,
+    enableBackground: true,
+    distanceFilterMeters: 5,   // only emit if moved ≥ 5 m
   ),
 );
 
+// Foreground updates — while app is visible
 LiveLocation.instance.foregroundLocationStream.listen((location) {
-  print('${location.latitude}, ${location.longitude}');
+  print('Foreground: ${location.latitude}, ${location.longitude}');
+});
+
+// Background updates — while app is in the background
+LiveLocation.instance.backgroundLocationStream.listen((location) {
+  print('Background: ${location.latitude}, ${location.longitude}');
 });
 
 await LiveLocation.instance.startLocationUpdates(Duration(minutes: 5));
 ```
 
-That's it. No manual channel setup, no confusing callbacks — just a clean Dart stream.
+That's it. No manual channel setup, no confusing callbacks — just clean Dart streams.
 
 ---
 
 ## Features
 
-- Real-time location updates via a simple broadcast stream
-- Configurable time interval and distance filter
+- Real-time location updates via two separate broadcast streams — one for foreground, one for background
+- Configurable time interval (`timeIntervalSeconds`) between updates
+- Configurable distance filter (`distanceFilterMeters`) — native OS-level filtering, no wasted wake-ups
 - Foreground and background tracking
 - Android foreground service (required by Android OS for background location)
 - iOS background location mode support
+- Built-in `distanceTo()` on `LocationUpdate` for Haversine distance calculation between two points
 - Structured error handling with typed exceptions
 - Automatically stops tracking after a configurable duration
+- Last known location cache (`lastKnownLocation`)
 - Zero dependencies beyond Flutter and `plugin_platform_interface`
 
 ---
@@ -71,7 +81,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_live_location: ^0.0.1
+  flutter_live_location: ^0.6.1
   permission_handler: ^12.0.1  # Recommended for handling permissions
 ```
 
@@ -263,14 +273,20 @@ void main() async {
 }
 ```
 
-### 2 — Listen to the stream
+### 2 — Listen to the streams
 
-Set up your listener *before* you start tracking so you don't miss any updates:
+Set up your listeners *before* you start tracking so you don't miss any updates:
 
 ```dart
+// Foreground — fires while the app is visible
 LiveLocation.instance.foregroundLocationStream.listen((location) {
   print('Lat: ${location.latitude}, Lng: ${location.longitude}');
   print('Accuracy: ${location.accuracy} m');
+});
+
+// Background — fires while the app is backgrounded (requires enableBackground: true)
+LiveLocation.instance.backgroundLocationStream.listen((location) {
+  print('Background lat: ${location.latitude}, lng: ${location.longitude}');
 });
 ```
 
@@ -334,11 +350,12 @@ LiveLocation.instance.backgroundLocationStream.listen((location) {
 
 ### LocationConfig
 
-| Parameter | Type | Description |
-|---|---|---|
-| `timeIntervalSeconds` | `int` | Minimum seconds between location updates. Must be > 0. |
-| `accuracy` | `LocationAccuracy` | Desired GPS accuracy level. |
-| `enableBackground` | `bool` | Whether to continue tracking when the app is backgrounded. |
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `timeIntervalSeconds` | `int` | required | Minimum seconds between location updates. Must be > 0. |
+| `accuracy` | `LocationAccuracy` | required | Desired GPS accuracy level. |
+| `enableBackground` | `bool` | required | Whether to continue tracking when the app is backgrounded. |
+| `distanceFilterMeters` | `double` | `0` | Minimum metres the device must move before an update is emitted. `0` disables distance filtering. Forwarded directly to the native provider — the OS suppresses redundant wake-ups. |
 
 ### LocationAccuracy
 
@@ -380,11 +397,20 @@ await LiveLocation.instance.dispose();
 ### Streams
 
 ```dart
-// Foreground updates (app is visible)
+// Foreground updates — app is visible
 LiveLocation.instance.foregroundLocationStream  // Stream<LocationUpdate>
 
-// Background updates (app is in the background, requires enableBackground: true)
+// Background updates — app is in the background (requires enableBackground: true)
 LiveLocation.instance.backgroundLocationStream  // Stream<LocationUpdate>
+```
+
+Both are broadcast streams — multiple listeners are supported.
+
+### LocationUpdate methods
+
+```dart
+// Haversine great-circle distance in metres between two LocationUpdate points
+final metres = locationA.distanceTo(locationB);
 ```
 
 ### LocationUpdate fields
@@ -457,7 +483,8 @@ void main() async {
     config: LocationConfig(
       timeIntervalSeconds: 2,
       accuracy: LocationAccuracy.high,
-      enableBackground: false,
+      enableBackground: true,
+      distanceFilterMeters: 5, // only emit if moved ≥ 5 m
     ),
   );
 
@@ -473,12 +500,16 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   LocationUpdate? _lastLocation;
   bool _isTracking = false;
-  StreamSubscription<LocationUpdate>? _subscription;
+  StreamSubscription<LocationUpdate>? _fgSubscription;
+  StreamSubscription<LocationUpdate>? _bgSubscription;
 
   @override
   void initState() {
     super.initState();
-    _subscription = LiveLocation.instance.foregroundLocationStream.listen(
+    _fgSubscription = LiveLocation.instance.foregroundLocationStream.listen(
+      (location) => setState(() => _lastLocation = location),
+    );
+    _bgSubscription = LiveLocation.instance.backgroundLocationStream.listen(
       (location) => setState(() => _lastLocation = location),
     );
   }
@@ -498,7 +529,8 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
-    _subscription?.cancel();
+    _fgSubscription?.cancel();
+    _bgSubscription?.cancel();
     LiveLocation.instance.dispose();
     super.dispose();
   }
@@ -560,10 +592,12 @@ Android kills background processes aggressively. Check:
 
 ---
 
-**Q: No location in the iOS Simulator.**
+**Q: No location updates in the iOS Simulator.**
 
-Use the built-in simulation: **Features → Location** in the Simulator menu and pick a
-preset or enter custom coordinates.
+The iOS Simulator does not support continuous `CLLocationManager` updates in the current
+version. See the **Emulator & Simulator Testing** section at the top of this file for a full
+explanation and workaround. Use a physical iOS device for location testing until the
+simulator support is added.
 
 ---
 
