@@ -1,3 +1,9 @@
+## 0.7.0 — 2026-03-05
+
+### Features
+
+- add first-class permission API without requiring permission_handler
+
 ## 0.6.2 — 2026-03-05
 
 ### Bug Fixes

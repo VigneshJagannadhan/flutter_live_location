@@ -3,7 +3,7 @@ description: >-
   A Flutter plugin for real-time location tracking with configurable intervals
   and distance filters. Supports foreground and background tracking on Android
   and iOS.
-version: 0.6.2
+version: 0.7.0
 homepage: https://github.com/VigneshJagannadhan/flutter_live_location
 repository: https://github.com/VigneshJagannadhan/flutter_live_location
 issue_tracker: https://github.com/VigneshJagannadhan/flutter_live_location/issues
