@@ -63,6 +63,9 @@ class LiveLocation {
   late StreamController<LocationUpdate> _foregroundStreamController;
   late StreamController<LocationUpdate> _backgroundStreamController;
 
+  // Broadcast stream for errors that occur during an active tracking session
+  late StreamController<LocationException> _errorStreamController;
+
   // State management
   bool _isInitialized = false;
   bool _isDisposed = false;
@@ -131,6 +134,8 @@ class LiveLocation {
       onListen: _onStreamListened,
       onCancel: _onStreamCancelled,
     );
+
+    _errorStreamController = StreamController<LocationException>.broadcast();
   }
 
   /// Initializes the platform-specific implementation.
@@ -154,13 +159,15 @@ class LiveLocation {
 
   /// Wires the platform interface callbacks to this instance's stream controllers.
   ///
-  /// The platform channel layer calls [onForegroundLocation] and
-  /// [onBackgroundLocation] when native events arrive. By setting these here —
-  /// in the public API layer — we keep the method channel layer free of any
-  /// reference to this class, eliminating the circular dependency.
+  /// The platform channel layer calls [onForegroundLocation],
+  /// [onBackgroundLocation], and [onError] when native events arrive. By
+  /// setting these here — in the public API layer — we keep the method channel
+  /// layer free of any reference to this class, eliminating the circular
+  /// dependency.
   void _setupPlatformListeners() {
     _platform.onForegroundLocation = _onForegroundLocation;
     _platform.onBackgroundLocation = _onBackgroundLocation;
+    _platform.onError = _onNativeError;
   }
 
   void _onForegroundLocation(LocationUpdate location) {
@@ -173,6 +180,11 @@ class LiveLocation {
     if (_isDisposed) return;
     _lastKnownLocation = location;
     _backgroundStreamController.add(location);
+  }
+
+  void _onNativeError(LocationException error) {
+    if (_isDisposed) return;
+    _errorStreamController.add(error);
   }
 
   /// Called when a stream gets its first listener.
@@ -203,6 +215,19 @@ class LiveLocation {
   /// Multiple listeners are supported (broadcast stream).
   Stream<LocationUpdate> get backgroundLocationStream =>
       _backgroundStreamController.stream;
+
+  /// Stream of errors that occur during an active tracking session.
+  ///
+  /// Emits typed [LocationException] values for events such as:
+  /// - Permission revoked while tracking ([LocationPermissionException])
+  /// - Location services disabled mid-session ([LocationServiceDisabledException])
+  /// - General native location failures ([LocationPlatformException])
+  ///
+  /// Errors that occur before tracking starts (e.g. during [startLocationUpdates])
+  /// are thrown synchronously and do not appear on this stream.
+  /// Multiple listeners are supported (broadcast stream).
+  Stream<LocationException> get locationErrorStream =>
+      _errorStreamController.stream;
 
   /// Gets the last known location, or null if none received yet.
   LocationUpdate? get lastKnownLocation => _lastKnownLocation;
@@ -335,11 +360,13 @@ class LiveLocation {
       // Close streams
       await _foregroundStreamController.close();
       await _backgroundStreamController.close();
+      await _errorStreamController.close();
 
       // Detach callbacks before platform dispose so a stale reference to this
       // instance cannot receive events after the singleton has been reset.
       _platform.onForegroundLocation = null;
       _platform.onBackgroundLocation = null;
+      _platform.onError = null;
 
       // Call platform dispose
       await _platform.dispose();

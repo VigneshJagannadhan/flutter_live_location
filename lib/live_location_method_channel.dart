@@ -85,14 +85,31 @@ class MethodChannelLiveLocation extends LiveLocationPlatform {
       final code = args?['code'] as String?;
       final message = args?['message'] as String?;
 
-      if (code == 'PERMISSION_DENIED') {
-        debugPrint(
-          '[LiveLocation] You need permission. '
-          'Please grant location permission before starting tracking.',
+      final exception = _exceptionFromNativeError(code, message);
+      onError?.call(exception);
+    }
+  }
+
+  /// Maps a native error code and message to a typed [LocationException].
+  static LocationException _exceptionFromNativeError(
+    String? code,
+    String? message,
+  ) {
+    switch (code) {
+      case 'PERMISSION_DENIED':
+        return LocationPermissionException(
+          message: message ?? 'Location permission was revoked',
         );
-      } else {
-        debugPrint('[LiveLocation] Native error [$code]: $message');
-      }
+      case 'SERVICE_DISABLED':
+      case 'LOCATION_UNAVAILABLE':
+        return LocationServiceDisabledException(
+          message: message ?? 'Location services became unavailable',
+        );
+      default:
+        return LocationPlatformException(
+          message: message ?? 'A native location error occurred',
+          code: code,
+        );
     }
   }
 

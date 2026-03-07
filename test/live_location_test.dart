@@ -14,6 +14,9 @@ class MockLiveLocationPlatform
   void Function(LocationUpdate)? onBackgroundLocation;
 
   @override
+  void Function(LocationException)? onError;
+
+  @override
   Future<void> initialize({required LocationConfig config}) => Future.value();
 
   @override

@@ -93,6 +93,18 @@ class LocationManager(
                     }
                 }
             }
+
+            override fun onLocationAvailability(
+                locationAvailability: com.google.android.gms.location.LocationAvailability
+            ) {
+                if (!locationAvailability.isLocationAvailable && isTracking) {
+                    onError(
+                        "LOCATION_UNAVAILABLE",
+                        "Location is no longer available. " +
+                            "Location services may have been disabled."
+                    )
+                }
+            }
         }
     }
 
