@@ -1,3 +1,9 @@
+## 0.7.1 — 2026-03-07
+
+### Bug Fixes
+
+- surface native errors via locationErrorStream
+
 ## 0.7.0 — 2026-03-05
 
 ### Features
