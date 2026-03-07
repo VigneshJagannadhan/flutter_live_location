@@ -29,6 +29,9 @@ class _SuccessMockPlatform
   void Function(LocationUpdate)? onBackgroundLocation;
 
   @override
+  void Function(LocationException)? onError;
+
+  @override
   Future<void> initialize({required LocationConfig config}) => Future.value();
 
   @override
@@ -70,6 +73,9 @@ class _PermissionDeniedMockPlatform
 
   @override
   void Function(LocationUpdate)? onBackgroundLocation;
+
+  @override
+  void Function(LocationException)? onError;
 
   @override
   Future<void> initialize({required LocationConfig config}) => Future.value();
@@ -366,6 +372,95 @@ void main() {
       );
 
       expect(LiveLocation.instance.isTracking, isTrue);
+    });
+
+    // ── locationErrorStream ───────────────────────────────────────────────
+
+    test(
+      'locationErrorStream emits LocationPermissionException on PERMISSION_DENIED',
+      () async {
+        await LiveLocation.initialize(config: _config());
+
+        final errors = <LocationException>[];
+        final sub = LiveLocation.instance.locationErrorStream.listen(
+          errors.add,
+        );
+
+        // Simulate native pushing PERMISSION_DENIED after tracking has started
+        LiveLocationPlatform.instance.onError?.call(
+          LocationPermissionException(message: 'Permission revoked'),
+        );
+        await Future.microtask(() {});
+
+        expect(errors, hasLength(1));
+        expect(errors.first, isA<LocationPermissionException>());
+
+        await sub.cancel();
+      },
+    );
+
+    test(
+      'locationErrorStream emits LocationServiceDisabledException on SERVICE_DISABLED',
+      () async {
+        await LiveLocation.initialize(config: _config());
+
+        final errors = <LocationException>[];
+        final sub = LiveLocation.instance.locationErrorStream.listen(
+          errors.add,
+        );
+
+        LiveLocationPlatform.instance.onError?.call(
+          LocationServiceDisabledException(message: 'GPS turned off'),
+        );
+        await Future.microtask(() {});
+
+        expect(errors, hasLength(1));
+        expect(errors.first, isA<LocationServiceDisabledException>());
+
+        await sub.cancel();
+      },
+    );
+
+    test(
+      'locationErrorStream supports multiple simultaneous listeners',
+      () async {
+        await LiveLocation.initialize(config: _config());
+
+        final first = <LocationException>[];
+        final second = <LocationException>[];
+        final sub1 = LiveLocation.instance.locationErrorStream.listen(
+          first.add,
+        );
+        final sub2 = LiveLocation.instance.locationErrorStream.listen(
+          second.add,
+        );
+
+        LiveLocationPlatform.instance.onError?.call(
+          LocationPermissionException(),
+        );
+        await Future.microtask(() {});
+
+        expect(first, hasLength(1));
+        expect(second, hasLength(1));
+
+        await sub1.cancel();
+        await sub2.cancel();
+      },
+    );
+
+    test('locationErrorStream completes when dispose is called', () async {
+      await LiveLocation.initialize(config: _config());
+
+      var streamDone = false;
+      LiveLocation.instance.locationErrorStream.listen(
+        (_) {},
+        onDone: () => streamDone = true,
+      );
+
+      await LiveLocation.instance.dispose();
+      await Future.microtask(() {});
+
+      expect(streamDone, isTrue);
     });
 
     // ── Native → Dart permission callback ────────────────────────────────

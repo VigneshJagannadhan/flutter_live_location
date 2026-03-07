@@ -1,5 +1,6 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
+import 'exceptions/location_exceptions.dart';
 import 'live_location_method_channel.dart';
 import 'models/location_config.dart';
 import 'models/location_permission_status.dart';
@@ -51,6 +52,14 @@ abstract class LiveLocationPlatform extends PlatformInterface {
   /// [LiveLocation._setupPlatformListeners]. Platform implementations must
   /// call this instead of reaching directly into the public API singleton.
   void Function(LocationUpdate)? onBackgroundLocation;
+
+  /// Invoked by the platform channel layer when a native error occurs during
+  /// an active tracking session (e.g. permission revoked, location unavailable).
+  ///
+  /// The public API layer sets this during [initialize] via
+  /// [LiveLocation._setupPlatformListeners]. Errors that occur before tracking
+  /// starts are thrown synchronously and do not use this callback.
+  void Function(LocationException)? onError;
 
   /// Initializes the platform-specific implementation.
   ///
