@@ -81,8 +81,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_live_location: ^0.6.1
-  permission_handler: ^12.0.1  # Recommended for handling permissions
+  flutter_live_location: ^0.7.0
 ```
 
 Then run:
@@ -156,17 +155,46 @@ If you use background tracking, also enable the **Background Modes** capability 
 > you need to integrate the plugin — no external guides required. If you are already familiar
 > with Flutter permission handling, feel free to skip ahead.
 
-The recommended approach is to use the
-[`permission_handler`](https://pub.dev/packages/permission_handler) package alongside this plugin.
+The plugin exposes first-class permission methods — no additional package is required.
 
-### Step 1 — Add permission_handler
+### Check permission status
 
-```yaml
-dependencies:
-  permission_handler: ^12.0.1
+```dart
+final status = await LiveLocation.instance.checkPermission();
+// LocationPermissionStatus.granted | .denied | .deniedForever | .restricted
 ```
 
-### Step 2 — Android minimum SDK
+### Request permission
+
+```dart
+final status = await LiveLocation.instance.requestPermission();
+
+switch (status) {
+  case LocationPermissionStatus.granted:
+    // Proceed to startLocationUpdates
+    break;
+  case LocationPermissionStatus.denied:
+    // User dismissed — show a rationale and try again
+    break;
+  case LocationPermissionStatus.deniedForever:
+    // User selected "Don't ask again" — open device Settings
+    break;
+  case LocationPermissionStatus.restricted:
+    // iOS only: parental controls / MDM — cannot be changed from within the app
+    break;
+}
+```
+
+### Check if location services are enabled
+
+```dart
+final enabled = await LiveLocation.instance.checkLocationServiceEnabled();
+if (!enabled) {
+  // Prompt the user to enable location in device Settings
+}
+```
+
+### Android minimum SDK
 
 In your `android/app/build.gradle`, make sure `minSdk` is at least **21**:
 
@@ -178,74 +206,38 @@ android {
 }
 ```
 
-### Step 3 — Request foreground permission
+### Background permission (Android, optional)
 
-Call this before `startLocationUpdates`:
+Only required when you set `enableBackground: true`. Android 10+ requires a separate
+`ACCESS_BACKGROUND_LOCATION` permission ("Allow all the time"). Because Android does not
+allow apps to prompt for this directly, direct users to your app's Settings page after
+foreground permission is granted and explain why background access is needed.
 
-```dart
-import 'package:permission_handler/permission_handler.dart';
+### Android 13+ notification permission
 
-Future<bool> requestLocationPermission() async {
-  PermissionStatus status = await Permission.location.status;
-
-  if (status.isGranted) return true;
-
-  // Ask the user
-  status = await Permission.location.request();
-
-  if (status.isGranted) return true;
-
-  if (status.isPermanentlyDenied) {
-    // User selected "Don't ask again" — send them to Settings
-    await openAppSettings();
-  }
-
-  return false;
-}
-```
-
-### Step 4 — Request background permission (optional)
-
-Only required when you set `enableBackground: true`:
-
-```dart
-Future<bool> requestBackgroundPermission() async {
-  // Foreground must be granted first
-  final foreground = await requestLocationPermission();
-  if (!foreground) return false;
-
-  PermissionStatus status = await Permission.locationAlways.status;
-  if (status.isGranted) return true;
-
-  status = await Permission.locationAlways.request();
-  return status.isGranted;
-}
-```
-
-### Step 5 — Android 13+ notification permission
-
-Background tracking shows a foreground service notification on Android. Android 13 requires
-you to explicitly request notification permission:
-
-```dart
-if (await Permission.notification.isDenied) {
-  await Permission.notification.request();
-}
-```
+Background tracking shows a foreground service notification on Android 13+. Use any
+permission library to request `POST_NOTIFICATIONS` before starting background tracking.
 
 ### Putting it all together
 
 ```dart
 Future<void> startTrackingWithPermissions() async {
-  final hasPermission = await requestLocationPermission();
-  if (!hasPermission) {
-    print('Location permission denied.');
+  // 1. Check location services
+  final servicesEnabled =
+      await LiveLocation.instance.checkLocationServiceEnabled();
+  if (!servicesEnabled) {
+    print('Enable location services in device Settings.');
     return;
   }
 
-  // Android 13+ — request notification permission for the foreground service
-  await Permission.notification.request();
+  // 2. Request permission
+  final status = await LiveLocation.instance.requestPermission();
+  if (status != LocationPermissionStatus.granted) {
+    print('Location permission not granted: $status');
+    return;
+  }
 
+  // 3. Start tracking
   await LiveLocation.instance.startLocationUpdates(Duration(minutes: 10));
 }
 ```
@@ -382,6 +374,19 @@ await LiveLocation.initialize(config: LocationConfig(...));
 LiveLocation.instance
 ```
 
+### Permissions
+
+```dart
+// Check current status (no dialog)
+await LiveLocation.instance.checkPermission();     // → LocationPermissionStatus
+
+// Show the system permission dialog (if not yet determined)
+await LiveLocation.instance.requestPermission();   // → LocationPermissionStatus
+
+// Check if the device's location services are enabled
+await LiveLocation.instance.checkLocationServiceEnabled(); // → bool
+```
+
 ### Tracking control
 
 ```dart
@@ -475,7 +480,6 @@ try {
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_live_location/flutter_live_location.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -516,8 +520,8 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _start() async {
-    final status = await Permission.location.request();
-    if (!status.isGranted) return;
+    final status = await LiveLocation.instance.requestPermission();
+    if (status != LocationPermissionStatus.granted) return;
 
     await LiveLocation.instance.startLocationUpdates(Duration(minutes: 5));
     setState(() => _isTracking = true);
@@ -638,18 +642,9 @@ where the code can be improved. Contributions to any of these are very welcome.
 
 ### Tech Debt / Planned Improvements
 
-- **No native permission API** — the plugin does not expose `checkPermission()`,
-  `requestPermission()`, or `checkLocationServiceEnabled()` as first-class methods. You
-  currently need `permission_handler` for this. Native wrappers for these are planned so the
-  plugin is self-contained.
-
 - **No `LocationConfig.copyWith()`** — there is no convenience method to create a modified
   copy of a config. This makes re-initializing with slightly different settings more verbose
   than it needs to be.
-
-- **`PermissionStatus` not re-exported** — the package imports `PermissionStatus` internally
-  but does not re-export it from the main library barrel, so consumers that need to reference
-  the type must import it separately.
 
 - **iOS significant-location-change mode is not yet wired** — `CLLocationManager` supports a
   lower-power "significant change" mode that is useful for apps that only need coarse position
