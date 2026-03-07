@@ -184,8 +184,9 @@ class MethodChannelLiveLocation extends LiveLocationPlatform {
   @override
   Future<LocationPermissionStatus> checkPermission() async {
     try {
-      final status =
-          await methodChannel.invokeMethod<String>('checkPermission');
+      final status = await methodChannel.invokeMethod<String>(
+        'checkPermission',
+      );
       return _permissionStatusFromString(status);
     } on PlatformException catch (e) {
       throw LocationPlatformException(
@@ -198,8 +199,9 @@ class MethodChannelLiveLocation extends LiveLocationPlatform {
   @override
   Future<LocationPermissionStatus> requestPermission() async {
     try {
-      final status =
-          await methodChannel.invokeMethod<String>('requestPermission');
+      final status = await methodChannel.invokeMethod<String>(
+        'requestPermission',
+      );
       return _permissionStatusFromString(status);
     } on PlatformException catch (e) {
       throw LocationPlatformException(
