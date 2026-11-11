@@ -36,3 +36,6 @@ migrate_working_dir/
 .claude
 .agents
 .github/instructions
+android/.gradle/
+android/build/
+IMPROVEMENTS.md
