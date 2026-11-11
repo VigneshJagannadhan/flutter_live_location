@@ -141,7 +141,7 @@ jobs:
             || true)
 
           {
-            echo "## ${NEW_VERSION} — ${DATE}"
+            echo "## ${NEW_VERSION} - ${DATE}"
             echo ""
             if [ -n "$FEATS" ]; then
               echo "### Features"
@@ -174,6 +174,25 @@ jobs:
           steps.guard.outputs.skip == 'false' &&
           steps.release.outputs.skip == 'false'
         run: flutter pub get
+
+      # Never publish code that fails the same checks PRs must pass.
+      - name: Check formatting
+        if: >
+          steps.guard.outputs.skip == 'false' &&
+          steps.release.outputs.skip == 'false'
+        run: dart format --set-exit-if-changed .
+
+      - name: Analyze
+        if: >
+          steps.guard.outputs.skip == 'false' &&
+          steps.release.outputs.skip == 'false'
+        run: flutter analyze
+
+      - name: Run tests
+        if: >
+          steps.guard.outputs.skip == 'false' &&
+          steps.release.outputs.skip == 'false'
+        run: flutter test
 
       - name: Publish to pub.dev
         if: >
